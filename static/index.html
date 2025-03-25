@@ -1,0 +1,680 @@
+<!-- static/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C3D Database Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        .file-card {
+            transition: all 0.3s;
+        }
+        .file-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .marker-badge, .channel-badge, .event-badge {
+            margin-right: 5px;
+            margin-bottom: 5px;
+            font-size: 0.8rem;
+        }
+        
+        /* Tree Structure Styles */
+        .classification-item {
+            margin-bottom: 1.5rem;
+            border-left: 3px solid #007bff;
+            padding-left: 0.5rem;
+        }
+        
+        .subject-container {
+            border-left: 2px solid #6c757d;
+            margin-left: 1rem;
+        }
+        
+        .session-container {
+            border-left: 2px solid #28a745;
+            margin-left: 1rem;
+        }
+        
+        .file-container {
+            margin-left: 1rem;
+        }
+        
+        .file-item {
+            background-color: rgba(0, 0, 0, 0.03);
+            border-radius: 0.25rem;
+            transition: all 0.2s;
+        }
+        
+        .file-item:hover {
+            background-color: rgba(0, 0, 0, 0.06);
+            transform: translateX(3px);
+        }
+        
+        .tree-path {
+            color: #6c757d;
+            font-style: italic;
+            margin-bottom: 1rem;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+</head>
+<body>
+    <div id="app">
+        <nav class="navbar navbar-expand-lg navbar-light bg-light">
+            <div class="container">
+                <a class="navbar-brand" href="#">C3D Database Manager</a>
+                <ul class="nav nav-tabs" id="mainTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="search-tab" data-bs-toggle="tab" data-bs-target="#search-tab-pane" 
+                                type="button" role="tab" aria-controls="search-tab-pane" aria-selected="true">
+                            <i class="bi bi-search"></i> Search
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="groups-tab" data-bs-toggle="tab" data-bs-target="#groups-tab-pane" 
+                                type="button" role="tab" aria-controls="groups-tab-pane" aria-selected="false">
+                            <i class="bi bi-collection"></i> Groups
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <div class="tab-content" id="mainTabsContent">
+                <!-- Search Tab -->
+                <div class="tab-pane fade show active" id="search-tab-pane" role="tabpanel" aria-labelledby="search-tab" tabindex="0">
+                    <div class="row">
+                        <!-- Left sidebar with search controls -->
+                        <div class="col-md-4">
+                            <!-- Directory scan card -->
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5 class="card-title mb-0">Scan Directory for C3D Files</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form @submit.prevent="handleDirectoryScan">
+                                        <div class="mb-3">
+                                            <label for="directoryInput" class="form-label">Directory Path</label>
+                                            <input type="text" class="form-control" v-model="directoryPath" placeholder="/path/to/c3d/files">
+                                        </div>
+                                        <button type="submit" class="btn btn-primary">Scan Directory</button>
+                                    </form>
+                                    <div class="mt-3" v-html="directoryStatus"></div>
+                                    <div class="mt-3">
+                                        <small class="text-muted">This will scan the directory and all subdirectories for C3D files, extracting metadata without copying the files.</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Search card -->
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title mb-0">Search C3D Files</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form @submit.prevent="searchFiles">
+                                        <!-- Basic Metadata Filters -->
+                                        <div class="filter-section mb-3">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <h6 class="mb-0">Basic Metadata Filters</h6>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary" @click="toggleFilterGroup('basic')">
+                                                    <i class="bi" :class="filterGroups.basic ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+                                                </button>
+                                            </div>
+                                            <hr class="mt-2 mb-3">
+                                            
+                                            <div v-if="filterGroups.basic">
+                                                <!-- Filename with regex toggle -->
+                                                <div class="mb-3">
+                                                    <label for="filenameSearch" class="form-label">Filename</label>
+                                                    <div class="input-group">
+                                                        <input type="text" class="form-control" v-model="searchFilters.filename.value" placeholder="Enter filename">
+                                                        <button class="btn" :class="searchFilters.filename.use_regex ? 'btn-primary' : 'btn-outline-secondary'" 
+                                                                type="button" @click="toggleRegex('filename')" title="Toggle regex">
+                                                            <i class="bi bi-regex"></i>
+                                                        </button>
+                                                    </div>
+                                                    <small v-if="searchFilters.filename.use_regex" class="form-text text-muted">Regex mode active</small>
+                                                </div>
+                                                
+                                                <!-- Classification with regex toggle -->
+                                                <div class="mb-3">
+                                                    <label for="classificationSearch" class="form-label">Classification</label>
+                                                    <div class="input-group">
+                                                        <input type="text" class="form-control" v-model="searchFilters.classification.value" placeholder="Enter classification">
+                                                        <button class="btn" :class="searchFilters.classification.use_regex ? 'btn-primary' : 'btn-outline-secondary'" 
+                                                                type="button" @click="toggleRegex('classification')" title="Toggle regex">
+                                                            <i class="bi bi-regex"></i>
+                                                        </button>
+                                                    </div>
+                                                    <small v-if="searchFilters.classification.use_regex" class="form-text text-muted">Regex mode active</small>
+                                                </div>
+                                                
+                                                <!-- Subject with regex toggle -->
+                                                <div class="mb-3">
+                                                    <label for="subjectSearch" class="form-label">Subject</label>
+                                                    <div class="input-group">
+                                                        <input type="text" class="form-control" v-model="searchFilters.subject.value" placeholder="Enter subject">
+                                                        <button class="btn" :class="searchFilters.subject.use_regex ? 'btn-primary' : 'btn-outline-secondary'" 
+                                                                type="button" @click="toggleRegex('subject')" title="Toggle regex">
+                                                            <i class="bi bi-regex"></i>
+                                                        </button>
+                                                    </div>
+                                                    <small v-if="searchFilters.subject.use_regex" class="form-text text-muted">Regex mode active</small>
+                                                </div>
+                                                
+                                                <!-- Session with regex toggle -->
+                                                <div class="mb-3">
+                                                    <label for="sessionSearch" class="form-label">Session</label>
+                                                    <div class="input-group">
+                                                        <input type="text" class="form-control" v-model="searchFilters.session_name.value" placeholder="Enter session name">
+                                                        <button class="btn" :class="searchFilters.session_name.use_regex ? 'btn-primary' : 'btn-outline-secondary'" 
+                                                                type="button" @click="toggleRegex('session_name')" title="Toggle regex">
+                                                            <i class="bi bi-regex"></i>
+                                                        </button>
+                                                    </div>
+                                                    <small v-if="searchFilters.session_name.use_regex" class="form-text text-muted">Regex mode active</small>
+                                                </div>
+                                                
+                                                <div class="mb-3 row">
+                                                    <div class="col">
+                                                        <label for="minDurationSearch" class="form-label">Min Duration (s)</label>
+                                                        <input type="number" class="form-control" v-model.number="searchFilters.min_duration" min="0" step="0.1">
+                                                    </div>
+                                                    <div class="col">
+                                                        <label for="maxDurationSearch" class="form-label">Max Duration (s)</label>
+                                                        <input type="number" class="form-control" v-model.number="searchFilters.max_duration" min="0" step="0.1">
+                                                    </div>
+                                                </div>
+                                                <div class="mb-3 row">
+                                                    <div class="col">
+                                                        <label for="minFrameSearch" class="form-label">Min Frames</label>
+                                                        <input type="number" class="form-control" v-model.number="searchFilters.min_frame_count" min="0" step="1">
+                                                    </div>
+                                                    <div class="col">
+                                                        <label for="maxFrameSearch" class="form-label">Max Frames</label>
+                                                        <input type="number" class="form-control" v-model.number="searchFilters.max_frame_count" min="0" step="1">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Content Filters -->
+                                        <div class="filter-section mb-3">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <h6 class="mb-0">Content Filters</h6>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary" @click="toggleFilterGroup('content')">
+                                                    <i class="bi" :class="filterGroups.content ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+                                                </button>
+                                            </div>
+                                            <hr class="mt-2 mb-3">
+                                            
+                                            <div v-if="filterGroups.content">
+                                                <!-- Marker with regex toggle -->
+                                                <div class="mb-3">
+                                                    <label for="markerSearch" class="form-label">Marker</label>
+                                                    <div class="input-group">
+                                                        <input type="text" class="form-control" v-model="searchFilters.marker.value" placeholder="Enter marker name">
+                                                        <button class="btn" :class="searchFilters.marker.use_regex ? 'btn-primary' : 'btn-outline-secondary'" 
+                                                                type="button" @click="toggleRegex('marker')" title="Toggle regex">
+                                                            <i class="bi bi-regex"></i>
+                                                        </button>
+                                                    </div>
+                                                    <small v-if="searchFilters.marker.use_regex" class="form-text text-muted">Regex mode active</small>
+                                                </div>
+                                                
+                                                <!-- Channel with regex toggle -->
+                                                <div class="mb-3">
+                                                    <label for="channelSearch" class="form-label">Channel</label>
+                                                    <div class="input-group">
+                                                        <input type="text" class="form-control" v-model="searchFilters.channel.value" placeholder="Enter channel name">
+                                                        <button class="btn" :class="searchFilters.channel.use_regex ? 'btn-primary' : 'btn-outline-secondary'" 
+                                                                type="button" @click="toggleRegex('channel')" title="Toggle regex">
+                                                            <i class="bi bi-regex"></i>
+                                                        </button>
+                                                    </div>
+                                                    <small v-if="searchFilters.channel.use_regex" class="form-text text-muted">Regex mode active</small>
+                                                </div>
+                                                
+                                                <!-- Event with regex toggle -->
+                                                <div class="mb-3">
+                                                    <label for="eventSearch" class="form-label">Event</label>
+                                                    <div class="input-group">
+                                                        <input type="text" class="form-control" v-model="searchFilters.event.value" placeholder="Enter event name">
+                                                        <button class="btn" :class="searchFilters.event.use_regex ? 'btn-primary' : 'btn-outline-secondary'" 
+                                                                type="button" @click="toggleRegex('event')" title="Toggle regex">
+                                                            <i class="bi bi-regex"></i>
+                                                        </button>
+                                                    </div>
+                                                    <small v-if="searchFilters.event.use_regex" class="form-text text-muted">Regex mode active</small>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Analysis Filters -->
+                                        <div class="filter-section mb-3">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <h6 class="mb-0">Analysis Filters</h6>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary" @click="toggleFilterGroup('analysis')">
+                                                    <i class="bi" :class="filterGroups.analysis ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+                                                </button>
+                                            </div>
+                                            <hr class="mt-2 mb-3">
+                                            
+                                            <div v-if="filterGroups.analysis">
+                                                <div class="mb-3">
+                                                    <label for="analysisNameSearch" class="form-label">Analysis Type</label>
+                                                    <select class="form-select" v-model="searchFilters.analysis_name" @change="onAnalysisChange">
+                                                        <option value="">None</option>
+                                                        <option v-for="analysis in analyses" :key="analysis.name" :value="analysis.name">
+                                                            {{ analysis.display_name }}
+                                                        </option>
+                                                    </select>
+                                                </div>
+                                                
+                                                <!-- Dynamic Analysis Parameters -->
+                                                <div v-if="selectedAnalysis" class="mb-3">
+                                                    <h6>Analysis Parameters</h6>
+                                                    <div class="card p-3 mb-3">
+                                                        <p class="small text-muted">{{ selectedAnalysis.description }}</p>
+                                                        
+                                                        <!-- Generate input fields based on parameters -->
+                                                        <div v-for="(type, key) in selectedAnalysis.parameters" :key="key" class="mb-2">
+                                                            <label :for="'param-' + key" class="form-label">{{ key }}</label>
+                                                            
+                                                            <!-- String input -->
+                                                            <input v-if="type === 'str' || type === String" 
+                                                                :id="'param-' + key" 
+                                                                type="text" 
+                                                                class="form-control form-control-sm" 
+                                                                v-model="parsedAnalysisParams[key]"
+                                                                @input="updateAnalysisParam(key, $event.target.value)">
+                                                            
+                                                            <!-- Number input -->
+                                                            <input v-else-if="type === 'int' || type === 'float' || type === Number"
+                                                                :id="'param-' + key"
+                                                                type="number"
+                                                                class="form-control form-control-sm"
+                                                                v-model.number="parsedAnalysisParams[key]"
+                                                                @input="updateAnalysisParam(key, Number($event.target.value))"
+                                                                :step="type === 'float' ? 0.1 : 1">
+                                                            
+                                                            <!-- Boolean input -->
+                                                            <div v-else-if="type === 'bool' || type === Boolean" class="form-check form-switch">
+                                                                <input 
+                                                                    :id="'param-' + key"
+                                                                    class="form-check-input"
+                                                                    type="checkbox"
+                                                                    v-model="parsedAnalysisParams[key]"
+                                                                    @change="updateAnalysisParam(key, $event.target.checked)">
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="d-flex justify-content-between">
+                                            <button type="submit" class="btn btn-primary">Search</button>
+                                            <button type="button" class="btn btn-secondary" @click="clearSearchForm">Clear</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right content area with search results -->
+                        <div class="col-md-8">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <h4 class="mb-0">Search Results</h4>
+                                    <div id="fileCountInfo" class="text-muted">{{ fileCountInfo }}</div>
+                                </div>
+                                <!-- Group action buttons -->
+                                <div class="btn-group" v-if="selectedFiles.length > 0">
+                                    <button type="button" class="btn btn-primary" @click="showAddToGroupModal()">
+                                        <i class="bi bi-plus-circle"></i> Add to Group
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" @click="clearSelection()">
+                                        Clear Selection ({{ selectedFiles.length }})
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Hierarchy Filter Controls -->
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <label for="classificationFilter" class="form-label">Classification</label>
+                                            <select class="form-select" v-model="selectedClassification" @change="loadSubjects">
+                                                <option value="">All Classifications</option>
+                                                <option v-for="classification in classifications" :key="classification" :value="classification">{{ classification }}</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="subjectFilter" class="form-label">Subject</label>
+                                            <select class="form-select" v-model="selectedSubject" @change="loadSessions">
+                                                <option value="">All Subjects</option>
+                                                <option v-for="subject in subjects" :key="subject" :value="subject">{{ subject }}</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="sessionFilter" class="form-label">Session</label>
+                                            <select class="form-select" v-model="selectedSession" @change="searchFiles">
+                                                <option value="">All Sessions</option>
+                                                <option v-for="session in sessions" :key="session" :value="session">{{ session }}</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Select all checkbox -->
+                            <div class="form-check mb-2" v-if="files.length > 0">
+                                <input class="form-check-input" type="checkbox" v-model="selectAllFiles" @change="toggleSelectAll" id="selectAllCheckbox">
+                                <label class="form-check-label" for="selectAllCheckbox">
+                                    Select All Files
+                                </label>
+                            </div>
+
+                            <!-- Results container -->
+                            <div id="results" class="row row-cols-1 g-4">
+                                <!-- Hierarchical tree view -->
+                                <div v-if="Object.keys(fileTree).length > 0" class="accordion" id="fileTreeAccordion">
+                                    <!-- Classifications -->
+                                    <div v-for="(classificationData, classification, classIndex) in fileTree" :key="classification" class="accordion-item mb-3">
+                                        <h2 class="accordion-header" :id="'classification-' + classIndex">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                                                    :data-bs-target="'#classification-collapse-' + classIndex" aria-expanded="false" 
+                                                    :aria-controls="'classification-collapse-' + classIndex">
+                                                <strong>{{ classification }}</strong>
+                                            </button>
+                                        </h2>
+                                        <div :id="'classification-collapse-' + classIndex" class="accordion-collapse collapse" 
+                                             :aria-labelledby="'classification-' + classIndex" data-bs-parent="#fileTreeAccordion">
+                                            <div class="accordion-body p-2">
+                                                <div class="subject-container ps-3">
+                                                    <!-- Subjects -->
+                                                    <div v-for="(subjectData, subject, subjectIndex) in classificationData.subjects" :key="subject" class="card mb-2">
+                                                        <div class="card-header d-flex justify-content-between align-items-center py-2">
+                                                            <h5 class="mb-0">
+                                                                <button class="btn btn-link text-decoration-none collapsed" type="button" 
+                                                                        data-bs-toggle="collapse" :data-bs-target="'#subject-body-' + classIndex + '-' + subjectIndex" 
+                                                                        aria-expanded="false" :aria-controls="'subject-body-' + classIndex + '-' + subjectIndex">
+                                                                    {{ subject }}
+                                                                </button>
+                                                            </h5>
+                                                        </div>
+                                                        <div :id="'subject-body-' + classIndex + '-' + subjectIndex" class="collapse">
+                                                            <div class="card-body p-2">
+                                                                <div class="session-container ps-3">
+                                                                    <!-- Sessions -->
+                                                                    <div v-for="(sessionData, session, sessionIndex) in subjectData.sessions" :key="session" class="card mb-2">
+                                                                        <div class="card-header d-flex justify-content-between align-items-center py-2">
+                                                                            <h6 class="mb-0">
+                                                                                <button class="btn btn-link text-decoration-none collapsed" type="button" 
+                                                                                        data-bs-toggle="collapse" :data-bs-target="'#session-body-' + classIndex + '-' + subjectIndex + '-' + sessionIndex" 
+                                                                                        aria-expanded="false" :aria-controls="'session-body-' + classIndex + '-' + subjectIndex + '-' + sessionIndex">
+                                                                                    {{ session }}
+                                                                                </button>
+                                                                            </h6>
+                                                                            <span class="badge rounded-pill bg-info">{{ sessionData.files.length }} files</span>
+                                                                        </div>
+                                                                        <div :id="'session-body-' + classIndex + '-' + subjectIndex + '-' + sessionIndex" class="collapse">
+                                                                            <div class="card-body p-2">
+                                                                                <div class="file-container">
+                                                                                    <!-- Files -->
+                                                                                    <div v-for="file in sessionData.files" :key="file.id" class="file-item mb-2 p-2 border rounded d-flex justify-content-between align-items-center">
+                                                                                        <div class="file-info">
+                                                                                            <div class="d-flex align-items-center">
+                                                                                                <i class="bi bi-file-earmark me-2"></i>
+                                                                                                <span class="filename">{{ file.filename }}</span>
+                                                                                            </div>
+                                                                                            <small class="text-muted">
+                                                                                                {{ formatFileSize(file.file_size) }} | {{ file.duration !== undefined ? file.duration.toFixed(2) : '0.00' }}s | {{ file.frame_count }} frames
+                                                                                            </small>
+                                                                                        </div>
+                                                                                        <div class="file-actions">
+                                                                                            <button class="btn btn-sm btn-outline-primary" @click="showFileDetails(file.id)">View</button>
+                                                                                            <button class="btn btn-sm btn-outline-danger" @click="deleteFile(file.id)">Delete</button>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Fallback for empty search results -->
+                                <div v-if="Object.keys(fileTree).length === 0 && !loading" class="alert alert-info">
+                                    No files found matching your search criteria.
+                                </div>
+                            </div>
+                            
+                            <!-- Loading spinner -->
+                            <div id="loadingResults" class="text-center mt-3" v-if="loading">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Groups Tab -->
+                <div class="tab-pane fade" id="groups-tab-pane" role="tabpanel" aria-labelledby="groups-tab" tabindex="0">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h4>Trial Groups</h4>
+                                <button class="btn btn-primary" @click="showCreateGroupModal()">
+                                    <i class="bi bi-plus-circle"></i> Create New Group
+                                </button>
+                            </div>
+
+                            <!-- Groups list -->
+                            <div class="row row-cols-1 row-cols-md-3 g-4" v-if="groups.length > 0">
+                                <div class="col" v-for="group in groups" :key="group.id">
+                                    <div class="card h-100">
+                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                            <h5 class="card-title mb-0">{{ group.name }}</h5>
+                                            <div class="dropdown">
+                                                <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown">
+                                                    <i class="bi bi-three-dots-vertical"></i>
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end">
+                                                    <li><a class="dropdown-item" href="#" @click.prevent="showEditGroupModal(group)">Edit</a></li>
+                                                    <li><a class="dropdown-item" href="#" @click.prevent="deleteGroup(group.id)">Delete</a></li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <p class="card-text">{{ group.description || 'No description' }}</p>
+                                            <div class="d-flex justify-content-between">
+                                                <small class="text-muted">{{ group.file_count }} files</small>
+                                                <small class="text-muted">Updated: {{ new Date(group.date_modified).toLocaleDateString() }}</small>
+                                            </div>
+                                        </div>
+                                        <div class="card-footer bg-transparent">
+                                            <button class="btn btn-sm btn-outline-primary w-100" @click="viewGroupFiles(group.id)">
+                                                View Files
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Empty state -->
+                            <div class="alert alert-info" v-if="groups.length === 0 && !loading">
+                                No groups yet. Create a new group to organize your trial files.
+                            </div>
+                            
+                            <!-- Loading state -->
+                            <div class="text-center mt-3" v-if="loading">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Details Modal -->
+    <div class="modal fade" id="fileDetailsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="fileDetailsTitle">File Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="fileDetailsBody">
+                    <!-- Content will be loaded dynamically -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <a href="#" class="btn btn-primary" id="downloadFileBtn">Download File</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add to Group Modal -->
+    <div class="modal fade" id="addToGroupModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add to Group</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form @submit.prevent="addSelectedFilesToGroup">
+                        <div class="mb-3">
+                            <label for="groupSelect" class="form-label">Select Group</label>
+                            <select class="form-select" id="groupSelect" v-model="selectedGroupId">
+                                <option value="">Choose a group...</option>
+                                <option v-for="group in groups" :key="group.id" :value="group.id">{{ group.name }}</option>
+                            </select>
+                        </div>
+                        <div class="mb-3 d-flex justify-content-between">
+                            <span>Selected files: {{ selectedFiles.length }}</span>
+                            <button type="button" class="btn btn-sm btn-link" @click="clearSelection">Clear selection</button>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary" :disabled="!selectedGroupId || selectedFiles.length === 0">
+                                Add to Group
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Group Modal -->
+    <div class="modal fade" id="createGroupModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">{{ editingGroupId ? 'Edit Group' : 'Create New Group' }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form @submit.prevent="saveGroup">
+                        <div class="mb-3">
+                            <label for="groupName" class="form-label">Group Name</label>
+                            <input type="text" class="form-control" id="groupName" v-model="newGroup.name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="groupDescription" class="form-label">Description</label>
+                            <textarea class="form-control" id="groupDescription" v-model="newGroup.description" rows="3"></textarea>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">
+                                {{ editingGroupId ? 'Update Group' : 'Create Group' }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Group Files Modal -->
+    <div class="modal fade" id="groupFilesModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">{{ currentGroup ? currentGroup.name : '' }} - Files</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Loading state -->
+                    <div class="text-center" v-if="loading">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+
+                    <!-- File list -->
+                    <div v-else>
+                        <p v-if="groupFiles.length === 0" class="text-muted">No files in this group.</p>
+                        <div class="table-responsive">
+                            <table class="table table-hover" v-if="groupFiles.length > 0">
+                                <thead>
+                                    <tr>
+                                        <th>Filename</th>
+                                        <th>Classification</th>
+                                        <th>Subject</th>
+                                        <th>Session</th>
+                                        <th>Duration</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="file in groupFiles" :key="file.id">
+                                        <td>{{ file.filename }}</td>
+                                        <td>{{ file.classification || 'Uncategorized' }}</td>
+                                        <td>{{ file.subject_name || 'Unknown' }}</td>
+                                        <td>{{ file.session_name || 'Default' }}</td>
+                                        <td>{{ file.duration !== undefined ? file.duration.toFixed(2) : '0.00' }}s</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-outline-primary" @click="showFileDetails(file.id)">View</button>
+                                                <button class="btn btn-outline-danger" @click="removeFileFromGroup(file.id)">Remove</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
