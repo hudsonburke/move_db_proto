@@ -4,7 +4,6 @@ Initialization for models package with dependency injection to avoid circular im
 # Import all models but delay the resolution of relationships
 from .base import setup_relationship_handlers
 from .c3d_file import C3DFile, C3DFileCreate
-from .group import TrialGroup, TrialGroupCreate, TrialGroupUpdate, TrialGroupRead
 from .marker import Marker
 from .channel import AnalogChannel
 from .event import Event

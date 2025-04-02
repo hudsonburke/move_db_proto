@@ -167,10 +167,6 @@ def search_files(
                 query = query.where(col(C3DFile.session_name).contains(session_name))
     
     # Handle numeric range filters
-    if min_duration is not None:
-        query = query.where(C3DFile.duration >= min_duration)
-    if max_duration is not None:
-        query = query.where(C3DFile.duration <= max_duration)
     if min_frame_count is not None:
         query = query.where(C3DFile.frame_count >= min_frame_count)
     if max_frame_count is not None:
@@ -186,11 +182,20 @@ def search_files(
     # Execute base query with pagination
     files = session.exec(query.order_by(C3DFile.classification, C3DFile.subject_name, C3DFile.session_name, C3DFile.filename).offset(offset).limit(limit)).all()
     
-    # For marker, channel, and event filters, we need to post-process
+    # For marker, channel, event, and duration filters, we need to post-process
     result_files = []
     filtered_count = 0
     
     for file in files:
+        # Calculate duration
+        duration = file.frame_count / file.sample_rate if file.sample_rate else 0.0
+        
+        # Apply duration filters
+        if min_duration is not None and duration < min_duration:
+            continue
+        if max_duration is not None and duration > max_duration:
+            continue
+        
         # Get associated data
         markers = session.exec(select(Marker).where(Marker.file_id == file.filepath)).all()
         channels = session.exec(select(AnalogChannel).where(AnalogChannel.file_id == file.filepath)).all()
@@ -240,17 +245,18 @@ def search_files(
         # Include file in results with its related data
         result_files.append(
             FileRead(
+                id=file.id,
                 filename=file.filename,
                 filepath=file.filepath,
                 file_size=file.file_size,
-                date_added=file.date_created,
-                duration=file.duration,
+                date_added=file.date_added,
+                duration=file.frame_count / file.sample_rate if file.sample_rate else 0.0,
                 frame_count=file.frame_count,
                 sample_rate=file.sample_rate,
                 subject_name=file.subject_name,
                 classification=file.classification,
                 session_name=file.session_name,
-                file_metadata=file.description,
+                file_metadata=file.file_metadata,
                 markers=[MarkerRead(marker_name=m.marker_name) for m in markers],
                 channels=[ChannelRead(channel_name=c.channel_name) for c in channels],
                 events=[EventRead(event_name=e.event_name, event_time=e.event_time) for e in events]

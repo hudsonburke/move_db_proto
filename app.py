@@ -50,7 +50,7 @@ app.add_middleware(
 )
 
 # Include routers
-from routers import directory_scan, files, search, classifications, subjects, sessions, analyses, groups, files_list
+from routers import directory_scan, files, search, classifications, subjects, sessions, analyses, groups, files_list, plotting
 
 # Important: Include files_list router before files router to ensure it gets matched first
 app.include_router(directory_scan.router, prefix="/api")
@@ -62,6 +62,7 @@ app.include_router(subjects.router, prefix="/api")
 app.include_router(sessions.router, prefix="/api")
 app.include_router(analyses.router, prefix="/api")
 app.include_router(groups.router, prefix="/api")
+app.include_router(plotting.router, prefix="/api")
 
 # Mount static files for the frontend
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

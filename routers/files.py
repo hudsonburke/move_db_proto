@@ -44,20 +44,6 @@ def get_files(
 ):
     """Get a list of C3D files with pagination and filtering."""
     try:
-        print(f">>> FILES ENDPOINT HIT <<<")
-        print(f"Received query parameters:")
-        print(f"filename: {filename}, regex: {filename_regex}")
-        print(f"classification: {classification}, regex: {classification_regex}")
-        print(f"subject: {subject}, regex: {subject_regex}")
-        print(f"session_name: {session_name}, regex: {session_regex}")
-        print(f"min_duration: {min_duration}, max_duration: {max_duration}")
-        print(f"min_frame_count: {min_frame_count}, max_frame_count: {max_frame_count}")
-        print(f"marker: {marker}, regex: {marker_regex}")
-        print(f"channel: {channel}, regex: {channel_regex}")
-        print(f"event: {event}, regex: {event_regex}")
-        print(f"analysis_name: {analysis_name}")
-        print(f"Limit: {limit}, Offset: {offset}")
-        
         # Parse analysis_params if provided as a string
         parsed_analysis_params = None
         if analysis_params:
@@ -115,17 +101,18 @@ def get_files(
             
             result_files.append(
                 FileRead(
+                    id=file.id,
                     filename=file.filename,
                     filepath=file.filepath,
                     file_size=file.file_size,
-                    date_added=file.date_created,
-                    duration=file.duration,
+                    date_added=file.date_added,
+                    duration=file.frame_count / file.sample_rate if file.sample_rate else 0.0,
                     frame_count=file.frame_count,
                     sample_rate=file.sample_rate,
                     subject_name=file.subject_name,
                     classification=file.classification,
                     session_name=file.session_name,
-                    file_metadata=file.description,
+                    file_metadata=file.file_metadata,
                     markers=[MarkerRead(marker_name=m.marker_name) for m in markers],
                     channels=[ChannelRead(channel_name=c.channel_name) for c in channels],
                     events=[EventRead(event_name=e.event_name, event_time=e.event_time) for e in events]
@@ -167,14 +154,14 @@ def get_file(filepath: str, session: Session = Depends(get_db_session)):
         filename=file.filename,
         filepath=file.filepath,
         file_size=file.file_size,
-        date_added=file.date_created,
-        duration=file.duration,
+        date_added=file.date_added,
+        duration=file.frame_count / file.sample_rate if file.sample_rate else 0.0,
         frame_count=file.frame_count,
         sample_rate=file.sample_rate,
         subject_name=file.subject_name,
         classification=file.classification,
         session_name=file.session_name,
-        file_metadata=file.description,
+        file_metadata=file.file_metadata,
         markers=[MarkerRead(marker_name=m.marker_name) for m in markers],
         channels=[ChannelRead(channel_name=c.channel_name) for c in channels],
         events=[EventRead(event_name=e.event_name, event_time=e.event_time) for e in events]

@@ -2,9 +2,9 @@
 C3D File models for database storage and API responses.
 """
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 from sqlmodel import Field, Relationship, SQLModel
-from .base import BaseModel, GroupFileLink
+from .base import C3DFileBase, GroupFileLink
 from .analysis import C3DFileAnalysisLink
 
 if TYPE_CHECKING:
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from .event import Event
     from .analysis import Analysis
 
-class C3DFile(BaseModel, table=True):
+class C3DFile(C3DFileBase, table=True):
     """Database model for C3D file records."""
     __tablename__ = "c3d_files"
     
@@ -24,8 +24,8 @@ class C3DFile(BaseModel, table=True):
     session_name: str | None = None
     
     # Use forward refs for relationships
-    groups: list["TrialGroup"] = Relationship(
-        back_populates="c3d_files", 
+    groups: List["TrialGroup"] = Relationship(
+        back_populates="c3d_files",
         link_model=GroupFileLink
     )
     markers: list["Marker"] = Relationship(back_populates="c3d_files")
@@ -36,7 +36,7 @@ class C3DFile(BaseModel, table=True):
         link_model=C3DFileAnalysisLink
     )
 
-class C3DFileCreate(SQLModel):
+class C3DFileCreate(C3DFileBase):
     """Model for creating C3D file records."""
     filename: str
     filepath: str
@@ -47,4 +47,3 @@ class C3DFileCreate(SQLModel):
     description: str | None = None
     classification: str | None = None
     session_name: str | None = None
-    group_ids: list[int] | None = None

@@ -5,8 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>C3D Database Manager</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <script src="https://unpkg.com/vue@2.6.14/dist/vue.js"></script>
     <style>
         .file-card {
             transition: all 0.3s;
@@ -59,7 +61,6 @@
             margin-bottom: 1rem;
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
 </head>
 <body>
     <div id="app">
@@ -77,6 +78,12 @@
                         <button class="nav-link" id="groups-tab" data-bs-toggle="tab" data-bs-target="#groups-tab-pane" 
                                 type="button" role="tab" aria-controls="groups-tab-pane" aria-selected="false">
                             <i class="bi bi-collection"></i> Groups
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="plot-tab" data-bs-toggle="tab" data-bs-target="#plot-tab-pane" 
+                                type="button" role="tab" aria-controls="plot-tab-pane" aria-selected="false">
+                            <i class="bi bi-bar-chart"></i> Plot
                         </button>
                     </li>
                 </ul>
@@ -382,68 +389,84 @@
                                 </label>
                             </div>
 
-                            <!-- Results container -->
-                            <div id="results" class="row row-cols-1 g-4">
-                                <!-- Hierarchical tree view -->
-                                <div v-if="Object.keys(fileTree).length > 0" class="accordion" id="fileTreeAccordion">
+                            <!-- Results container - Hierarchical View -->
+                            <div id="results">
+                                <div v-if="loading" class="text-center mt-3">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </div>
+                                <div v-else-if="Object.keys(fileTree).length === 0" class="alert alert-info">
+                                    No files found matching your search criteria.
+                                </div>
+                                <div v-else class="accordion" id="fileTreeAccordion">
                                     <!-- Classifications -->
-                                    <div v-for="(classificationData, classification, classIndex) in fileTree" :key="classification" class="accordion-item mb-3">
-                                        <h2 class="accordion-header" :id="'classification-' + classIndex">
-                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
-                                                    :data-bs-target="'#classification-collapse-' + classIndex" aria-expanded="false" 
-                                                    :aria-controls="'classification-collapse-' + classIndex">
-                                                <strong>{{ classification }}</strong>
+                                    <div v-for="(classificationData, classification) in fileTree" :key="classification" class="accordion-item mb-1 border-0 border-bottom">
+                                        <h2 class="accordion-header" :id="'header-class-' + classification.replace(/\W/g, '_')">
+                                            <button class="accordion-button collapsed bg-light fw-bold" type="button" data-bs-toggle="collapse" 
+                                                    :data-bs-target="'#collapse-class-' + classification.replace(/\W/g, '_')" aria-expanded="false" 
+                                                    :aria-controls="'collapse-class-' + classification.replace(/\W/g, '_')">
+                                                <i class="bi bi-folder2-open me-2"></i>{{ classification }}
                                             </button>
                                         </h2>
-                                        <div :id="'classification-collapse-' + classIndex" class="accordion-collapse collapse" 
-                                             :aria-labelledby="'classification-' + classIndex" data-bs-parent="#fileTreeAccordion">
-                                            <div class="accordion-body p-2">
-                                                <div class="subject-container ps-3">
-                                                    <!-- Subjects -->
-                                                    <div v-for="(subjectData, subject, subjectIndex) in classificationData.subjects" :key="subject" class="card mb-2">
-                                                        <div class="card-header d-flex justify-content-between align-items-center py-2">
-                                                            <h5 class="mb-0">
-                                                                <button class="btn btn-link text-decoration-none collapsed" type="button" 
-                                                                        data-bs-toggle="collapse" :data-bs-target="'#subject-body-' + classIndex + '-' + subjectIndex" 
-                                                                        aria-expanded="false" :aria-controls="'subject-body-' + classIndex + '-' + subjectIndex">
-                                                                    {{ subject }}
-                                                                </button>
-                                                            </h5>
-                                                        </div>
-                                                        <div :id="'subject-body-' + classIndex + '-' + subjectIndex" class="collapse">
-                                                            <div class="card-body p-2">
-                                                                <div class="session-container ps-3">
-                                                                    <!-- Sessions -->
-                                                                    <div v-for="(sessionData, session, sessionIndex) in subjectData.sessions" :key="session" class="card mb-2">
-                                                                        <div class="card-header d-flex justify-content-between align-items-center py-2">
-                                                                            <h6 class="mb-0">
-                                                                                <button class="btn btn-link text-decoration-none collapsed" type="button" 
-                                                                                        data-bs-toggle="collapse" :data-bs-target="'#session-body-' + classIndex + '-' + subjectIndex + '-' + sessionIndex" 
-                                                                                        aria-expanded="false" :aria-controls="'session-body-' + classIndex + '-' + subjectIndex + '-' + sessionIndex">
-                                                                                    {{ session }}
-                                                                                </button>
-                                                                            </h6>
-                                                                            <span class="badge rounded-pill bg-info">{{ sessionData.files.length }} files</span>
-                                                                        </div>
-                                                                        <div :id="'session-body-' + classIndex + '-' + subjectIndex + '-' + sessionIndex" class="collapse">
-                                                                            <div class="card-body p-2">
-                                                                                <div class="file-container">
-                                                                                    <!-- Files -->
-                                                                                    <div v-for="file in sessionData.files" :key="file.id" class="file-item mb-2 p-2 border rounded d-flex justify-content-between align-items-center">
-                                                                                        <div class="file-info">
-                                                                                            <div class="d-flex align-items-center">
-                                                                                                <i class="bi bi-file-earmark me-2"></i>
-                                                                                                <span class="filename">{{ file.filename }}</span>
-                                                                                            </div>
-                                                                                            <small class="text-muted">
-                                                                                                {{ formatFileSize(file.file_size) }} | {{ file.duration !== undefined ? file.duration.toFixed(2) : '0.00' }}s | {{ file.frame_count }} frames
-                                                                                            </small>
+                                        <div :id="'collapse-class-' + classification.replace(/\W/g, '_')" class="accordion-collapse collapse" 
+                                             :aria-labelledby="'header-class-' + classification.replace(/\W/g, '_')" data-bs-parent="#fileTreeAccordion">
+                                            <div class="accordion-body p-0">
+                                                <!-- Subjects - Accordion Item -->
+                                                <div v-for="(subjectData, subject) in classificationData.subjects" :key="classification + '-' + subject" class="accordion-item border-0">
+                                                    <h2 class="accordion-header" :id="'header-subj-' + classification.replace(/\W/g, '_') + '-' + subject.replace(/\W/g, '_')">
+                                                        <button class="accordion-button collapsed bg-light-subtle" type="button" data-bs-toggle="collapse" 
+                                                                :data-bs-target="'#collapse-subj-' + classification.replace(/\W/g, '_') + '-' + subject.replace(/\W/g, '_')" aria-expanded="false" 
+                                                                :aria-controls="'collapse-subj-' + classification.replace(/\W/g, '_') + '-' + subject.replace(/\W/g, '_')">
+                                                            <i class="bi bi-person me-2"></i>Subject: {{ subject }}
+                                                        </button>
+                                                    </h2>
+                                                    <div :id="'collapse-subj-' + classification.replace(/\W/g, '_') + '-' + subject.replace(/\W/g, '_')" class="accordion-collapse collapse ps-3" 
+                                                         :aria-labelledby="'header-subj-' + classification.replace(/\W/g, '_') + '-' + subject.replace(/\W/g, '_')">
+                                                        <div class="accordion-body p-0">
+                                                            <!-- Sessions - Accordion Item -->
+                                                            <div v-for="(sessionData, session) in subjectData.sessions" :key="classification + '-' + subject + '-' + session" class="accordion-item border-0">
+                                                                <h2 class="accordion-header" :id="'header-sess-' + classification.replace(/\W/g, '_') + '-' + subject.replace(/\W/g, '_') + '-' + session.replace(/\W/g, '_')">
+                                                                    <button class="accordion-button collapsed bg-light-subtle" type="button" data-bs-toggle="collapse" 
+                                                                            :data-bs-target="'#collapse-sess-' + classification.replace(/\W/g, '_') + '-' + subject.replace(/\W/g, '_') + '-' + session.replace(/\W/g, '_')" aria-expanded="false" 
+                                                                            :aria-controls="'collapse-sess-' + classification.replace(/\W/g, '_') + '-' + subject.replace(/\W/g, '_') + '-' + session.replace(/\W/g, '_')">
+                                                                        <i class="bi bi-camera-video me-2"></i>Session: {{ session }} <span class="badge bg-secondary ms-2">{{ sessionData.files.length }} files</span>
+                                                                    </button>
+                                                                </h2>
+                                                                <div :id="'collapse-sess-' + classification.replace(/\W/g, '_') + '-' + subject.replace(/\W/g, '_') + '-' + session.replace(/\W/g, '_')" class="accordion-collapse collapse ps-4" 
+                                                                     :aria-labelledby="'header-sess-' + classification.replace(/\W/g, '_') + '-' + subject.replace(/\W/g, '_') + '-' + session.replace(/\W/g, '_')">
+                                                                    <div class="accordion-body p-0">
+                                                                        <!-- Files - List Group -->
+                                                                        <div class="list-group list-group-flush">
+                                                                            <div v-for="file in sessionData.files" :key="file.id" class="list-group-item d-flex justify-content-between align-items-center ps-5">
+                                                                                <!-- Checkbox -->
+                                                                                <div class="form-check me-2">
+                                                                                    <input class="form-check-input" type="checkbox" 
+                                                                                           :value="file.id" 
+                                                                                           v-model="selectedFiles" 
+                                                                                           :key="'checkbox-' + file.id" 
+                                                                                           :id="'file-' + file.id">
+                                                                                </div>
+                                                                                <!-- File Info -->
+                                                                                <div class="file-info flex-grow-1">
+                                                                                    <label :for="'file-' + file.id" class="d-block text-decoration-none text-dark">
+                                                                                        <div class="d-flex align-items-center">
+                                                                                            <i class="bi bi-file-earmark me-2"></i>
+                                                                                            <span class="filename fw-bold">{{ file.filename }}</span>
                                                                                         </div>
-                                                                                        <div class="file-actions">
-                                                                                            <button class="btn btn-sm btn-outline-primary" @click="showFileDetails(file.id)">View</button>
-                                                                                            <button class="btn btn-sm btn-outline-danger" @click="deleteFile(file.id)">Delete</button>
-                                                                                        </div>
-                                                                                    </div>
+                                                                                        <small class="text-muted">
+                                                                                             {{ formatFileSize(file.file_size) }} | {{ formatDuration(file.duration) }}
+                                                                                        </small>
+                                                                                    </label>
+                                                                                </div>
+                                                                                <!-- Actions -->
+                                                                                <div class="file-actions ms-2" style="z-index: 1; position: relative;">
+                                                                                    <button class="btn btn-sm btn-outline-primary" @click.stop="showFileDetails(file.id)" title="View Details">
+                                                                                        <i class="bi bi-eye"></i>
+                                                                                    </button>
+                                                                                    <button class="btn btn-sm btn-outline-danger" @click.stop="deleteFile(file.id)" title="Delete File">
+                                                                                        <i class="bi bi-trash"></i>
+                                                                                    </button>
                                                                                 </div>
                                                                             </div>
                                                                         </div>
@@ -457,74 +480,107 @@
                                         </div>
                                     </div>
                                 </div>
-                                <!-- Fallback for empty search results -->
-                                <div v-if="Object.keys(fileTree).length === 0 && !loading" class="alert alert-info">
-                                    No files found matching your search criteria.
-                                </div>
                             </div>
-                            
-                            <!-- Loading spinner -->
-                            <div id="loadingResults" class="text-center mt-3" v-if="loading">
-                                <div class="spinner-border text-primary" role="status">
-                                    <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Groups Tab Pane -->
+                <div class="tab-pane fade" id="groups-tab-pane" role="tabpanel" aria-labelledby="groups-tab" tabindex="0">
+                    <div class="container mt-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h4>Trial Groups</h4>
+                            <button class="btn btn-primary" @click="showCreateGroupModal()">
+                                <i class="bi bi-plus-circle"></i> Create New Group
+                            </button>
+                        </div>
+
+                        <!-- Loading State -->
+                        <div v-if="loadingGroups" class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading groups...</span>
+                            </div>
+                        </div>
+
+                        <!-- Empty State -->
+                        <div v-else-if="groups.length === 0" class="alert alert-info">
+                            No groups found. Create one to get started!
+                        </div>
+
+                        <!-- Groups List -->
+                        <div v-else class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                            <div class="col" v-for="group in groups" :key="group.id">
+                                <div class="card h-100 shadow-sm">
+                                    <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                                        <h5 class="card-title mb-0 text-truncate" :title="group.name">{{ group.name }}</h5>
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <i class="bi bi-three-dots-vertical"></i>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end">
+                                                <li><a class="dropdown-item" href="#" @click.prevent="showEditGroupModal(group)"><i class="bi bi-pencil-square me-2"></i>Edit</a></li>
+                                                <li><a class="dropdown-item text-danger" href="#" @click.prevent="deleteGroup(group.id)"><i class="bi bi-trash me-2"></i>Delete</a></li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <p class="card-text text-muted small">{{ group.description || 'No description provided.' }}</p>
+                                        <div class="d-flex justify-content-between align-items-center mt-3">
+                                            <span class="badge bg-secondary">{{ group.file_count }} file{{ group.file_count !== 1 ? 's' : '' }}</span>
+                                            <small class="text-muted">Modified: {{ formatDate(group.date_modified) }}</small>
+                                        </div>
+                                    </div>
+                                    <div class="card-footer bg-transparent border-top-0 pt-0">
+                                        <button class="btn btn-sm btn-outline-primary w-100" @click="viewGroupFiles(group.id)">
+                                            <i class="bi bi-folder2-open me-1"></i> View Files
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Groups Tab -->
-                <div class="tab-pane fade" id="groups-tab-pane" role="tabpanel" aria-labelledby="groups-tab" tabindex="0">
-                    <div class="row">
-                        <div class="col-md-12">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h4>Trial Groups</h4>
-                                <button class="btn btn-primary" @click="showCreateGroupModal()">
-                                    <i class="bi bi-plus-circle"></i> Create New Group
-                                </button>
-                            </div>
-
-                            <!-- Groups list -->
-                            <div class="row row-cols-1 row-cols-md-3 g-4" v-if="groups.length > 0">
-                                <div class="col" v-for="group in groups" :key="group.id">
-                                    <div class="card h-100">
-                                        <div class="card-header d-flex justify-content-between align-items-center">
-                                            <h5 class="card-title mb-0">{{ group.name }}</h5>
-                                            <div class="dropdown">
-                                                <button class="btn btn-sm btn-light" type="button" data-bs-toggle="dropdown">
-                                                    <i class="bi bi-three-dots-vertical"></i>
-                                                </button>
-                                                <ul class="dropdown-menu dropdown-menu-end">
-                                                    <li><a class="dropdown-item" href="#" @click.prevent="showEditGroupModal(group)">Edit</a></li>
-                                                    <li><a class="dropdown-item" href="#" @click.prevent="deleteGroup(group.id)">Delete</a></li>
-                                                </ul>
-                                            </div>
+                <!-- Plot Tab -->
+                <div class="tab-pane fade" id="plot-tab-pane" role="tabpanel" aria-labelledby="plot-tab" tabindex="0">
+                    <div class="container-fluid">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5 class="card-title mb-0">Plot Controls</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label for="plot-file-select" class="form-label">Select File</label>
+                                            <select class="form-select" id="plot-file-select">
+                                                <option value="">Choose a file...</option>
+                                            </select>
                                         </div>
-                                        <div class="card-body">
-                                            <p class="card-text">{{ group.description || 'No description' }}</p>
-                                            <div class="d-flex justify-content-between">
-                                                <small class="text-muted">{{ group.file_count }} files</small>
-                                                <small class="text-muted">Updated: {{ new Date(group.date_modified).toLocaleDateString() }}</small>
-                                            </div>
+                                        <div class="mb-3">
+                                            <label for="plot-select" class="form-label">Select Plot Type</label>
+                                            <select class="form-select" id="plot-select">
+                                                <option value="">Choose a plot type...</option>
+                                            </select>
                                         </div>
-                                        <div class="card-footer bg-transparent">
-                                            <button class="btn btn-sm btn-outline-primary w-100" @click="viewGroupFiles(group.id)">
-                                                View Files
-                                            </button>
+                                        <div class="mb-3">
+                                            <label for="marker-select" class="form-label">Select Markers</label>
+                                            <select class="form-select" id="marker-select" multiple>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="channel-select" class="form-label">Select Channels</label>
+                                            <select class="form-select" id="channel-select" multiple>
+                                            </select>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            
-                            <!-- Empty state -->
-                            <div class="alert alert-info" v-if="groups.length === 0 && !loading">
-                                No groups yet. Create a new group to organize your trial files.
-                            </div>
-                            
-                            <!-- Loading state -->
-                            <div class="text-center mt-3" v-if="loading">
-                                <div class="spinner-border text-primary" role="status">
-                                    <span class="visually-hidden">Loading...</span>
+                            <div class="col-md-9">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div id="plot-container"></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -532,111 +588,122 @@
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- File Details Modal -->
-    <div class="modal fade" id="fileDetailsModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="fileDetailsTitle">File Details</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body" id="fileDetailsBody">
-                    <!-- Content will be loaded dynamically -->
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <a href="#" class="btn btn-primary" id="downloadFileBtn">Download File</a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Add to Group Modal -->
-    <div class="modal fade" id="addToGroupModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Add to Group</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form @submit.prevent="addSelectedFilesToGroup">
-                        <div class="mb-3">
-                            <label for="groupSelect" class="form-label">Select Group</label>
-                            <select class="form-select" id="groupSelect" v-model="selectedGroupId">
-                                <option value="">Choose a group...</option>
-                                <option v-for="group in groups" :key="group.id" :value="group.id">{{ group.name }}</option>
-                            </select>
-                        </div>
-                        <div class="mb-3 d-flex justify-content-between">
-                            <span>Selected files: {{ selectedFiles.length }}</span>
-                            <button type="button" class="btn btn-sm btn-link" @click="clearSelection">Clear selection</button>
-                        </div>
-                        <div class="d-flex justify-content-between">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-primary" :disabled="!selectedGroupId || selectedFiles.length === 0">
-                                Add to Group
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Create/Edit Group Modal -->
-    <div class="modal fade" id="createGroupModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">{{ editingGroupId ? 'Edit Group' : 'Create New Group' }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form @submit.prevent="saveGroup">
-                        <div class="mb-3">
-                            <label for="groupName" class="form-label">Group Name</label>
-                            <input type="text" class="form-control" id="groupName" v-model="newGroup.name" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="groupDescription" class="form-label">Description</label>
-                            <textarea class="form-control" id="groupDescription" v-model="newGroup.description" rows="3"></textarea>
-                        </div>
-                        <div class="d-flex justify-content-between">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-primary">
-                                {{ editingGroupId ? 'Update Group' : 'Create Group' }}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Group Files Modal -->
-    <div class="modal fade" id="groupFilesModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-xl">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">{{ currentGroup ? currentGroup.name : '' }} - Files</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <!-- Loading state -->
-                    <div class="text-center" v-if="loading">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
+        <!-- MODALS MOVED INSIDE #app -->
+        <!-- File Details Modal -->
+        <div class="modal fade" id="fileDetailsModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="fileDetailsTitle">File Details</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
+                    <div class="modal-body" id="fileDetailsBody">
+                        <!-- Content will be loaded dynamically -->
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <a href="#" class="btn btn-primary" id="downloadFileBtn">Download File</a>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-                    <!-- File list -->
-                    <div v-else>
-                        <p v-if="groupFiles.length === 0" class="text-muted">No files in this group.</p>
-                        <div class="table-responsive">
-                            <table class="table table-hover" v-if="groupFiles.length > 0">
+        <!-- Add to Group Modal -->
+        <div class="modal fade" id="addToGroupModal" tabindex="-1" aria-labelledby="addToGroupModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="addToGroupModalLabel">Add Selected Files to Group</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div v-if="loadingGroups" class="text-center">
+                            <div class="spinner-border spinner-border-sm" role="status"></div> Loading groups...
+                        </div>
+                        <form v-else @submit.prevent="addSelectedFilesToGroup">
+                            <div class="mb-3">
+                                <label for="groupSelect" class="form-label">Select Group</label>
+                                <select class="form-select" id="groupSelect" v-model="selectedGroupId" required>
+                                    <option :value="null" disabled>-- Select a Group --</option>
+                                    <option v-for="group in groups" :key="group.id" :value="group.id">
+                                        {{ group.name }} ({{ group.file_count }} files)
+                                    </option>
+                                </select>
+                                <div v-if="groups.length === 0" class="form-text text-muted">
+                                    No groups available. You can create one in the 'Groups' tab.
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <p class="mb-1">Files to add: <strong>{{ selectedFiles.length }}</strong></p>
+                                <button type="button" class="btn btn-sm btn-link p-0" @click="clearSelection">Clear selection</button>
+                            </div>
+                            <div class="d-flex justify-content-end">
+                                <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary" :disabled="!selectedGroupId || selectedFiles.length === 0 || addingFilesToGroup">
+                                    <span v-if="addingFilesToGroup" class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                    {{ addingFilesToGroup ? 'Adding...' : 'Add to Group' }}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create/Edit Group Modal -->
+        <div class="modal fade" id="createGroupModal" tabindex="-1" aria-labelledby="createGroupModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="createGroupModalLabel">{{ editingGroupId ? 'Edit Group' : 'Create New Group' }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form @submit.prevent="saveGroup">
+                            <div class="mb-3">
+                                <label for="groupName" class="form-label">Group Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="groupName" v-model.trim="newGroup.name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="groupDescription" class="form-label">Description</label>
+                                <textarea class="form-control" id="groupDescription" v-model="newGroup.description" rows="3"></textarea>
+                            </div>
+                            <div class="d-flex justify-content-end">
+                                <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary" :disabled="!newGroup.name || savingGroup">
+                                    <span v-if="savingGroup" class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                    {{ savingGroup ? (editingGroupId ? 'Updating...' : 'Creating...') : (editingGroupId ? 'Update Group' : 'Create Group') }}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Group Files Modal -->
+        <div class="modal fade" id="groupFilesModal" tabindex="-1" aria-labelledby="groupFilesModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="groupFilesModalLabel">Files in Group: {{ currentGroup ? currentGroup.name : '' }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Loading State -->
+                        <div v-if="loadingGroupFiles" class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading files...</span>
+                            </div>
+                        </div>
+                        <!-- Empty State -->
+                        <div v-else-if="groupFiles.length === 0" class="alert alert-light text-center">
+                            This group currently contains no files.
+                        </div>
+                        <!-- File Table -->
+                        <div v-else class="table-responsive">
+                            <table class="table table-hover table-sm align-middle">
                                 <thead>
                                     <tr>
                                         <th>Filename</th>
@@ -644,20 +711,24 @@
                                         <th>Subject</th>
                                         <th>Session</th>
                                         <th>Duration</th>
-                                        <th>Actions</th>
+                                        <th class="text-end">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr v-for="file in groupFiles" :key="file.id">
-                                        <td>{{ file.filename }}</td>
-                                        <td>{{ file.classification || 'Uncategorized' }}</td>
-                                        <td>{{ file.subject_name || 'Unknown' }}</td>
-                                        <td>{{ file.session_name || 'Default' }}</td>
-                                        <td>{{ file.duration !== undefined ? file.duration.toFixed(2) : '0.00' }}s</td>
-                                        <td>
+                                        <td class="text-truncate" :title="file.filename">{{ file.filename }}</td>
+                                        <td>{{ file.classification || 'N/A' }}</td>
+                                        <td>{{ file.subject_name || 'N/A' }}</td>
+                                        <td>{{ file.session_name || 'N/A' }}</td>
+                                        <td>{{ formatDuration(file.duration) }}</td>
+                                        <td class="text-end">
                                             <div class="btn-group btn-group-sm">
-                                                <button class="btn btn-outline-primary" @click="showFileDetails(file.id)">View</button>
-                                                <button class="btn btn-outline-danger" @click="removeFileFromGroup(file.id)">Remove</button>
+                                                <button class="btn btn-outline-primary" @click="showFileDetails(file.id)" title="View Details">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                                <button class="btn btn-outline-danger" @click="removeFileFromGroup(file.id)" title="Remove from Group">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -665,16 +736,20 @@
                             </table>
                         </div>
                     </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
+        <!-- END MODALS -->
 
+    </div> <!-- End #app -->
+
+    <script src="https://cdn.plot.ly/plotly-2.27.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
-    <script src="script.js"></script>
+    <!-- Load custom scripts AFTER dependencies -->
+    <script src="script.js"></script> 
+    <script src="/js/plotting.js"></script>
 </body>
 </html>

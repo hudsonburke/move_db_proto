@@ -107,20 +107,47 @@ def scan_directory_background(root_directory: str):
                         elif len(path_parts) == 1 and path_parts[0] != '.':
                             classification = path_parts[0]
                         
+                        # --- Convert ezc3d Parameters to Dict --- 
+                        metadata_dict = {}
+                        if "metadata" in c3d_data and hasattr(c3d_data["metadata"], 'groups'):
+                            try:
+                                for group_name, group_data in c3d_data["metadata"].groups():
+                                    metadata_dict[group_name] = {}
+                                    if hasattr(group_data, 'parameters'):
+                                        for param_name, param_data in group_data.parameters():
+                                            # Attempt to get serializable value, handle potential issues
+                                            try:
+                                                value = param_data.values
+                                                # Basic check for numpy arrays or other non-serializable types
+                                                if hasattr(value, 'tolist'): 
+                                                    value = value.tolist()
+                                                elif isinstance(value, (int, float, str, bool, list, dict, type(None))):
+                                                    pass # Already serializable
+                                                else:
+                                                    value = str(value) # Fallback to string representation
+                                                metadata_dict[group_name][param_name] = value
+                                            except Exception as param_err:
+                                                print(f"  Warning: Could not serialize parameter {param_name} in group {group_name} for file {file}: {param_err}")
+                                                metadata_dict[group_name][param_name] = f"Error serializing: {param_err}"
+                            except Exception as group_err:
+                                 print(f"Warning: Could not process metadata groups for file {file}: {group_err}")
+                        # --- End Conversion ---
+
                         # Create database entry with id as primary key and filepath as unique identifier
                         db_file = C3DFile(
                             filename=file,
                             filepath=filepath,  # unique identifier
                             file_size=file_size,
-                            date_created=datetime.now(),
-                            date_modified=datetime.now(),
-                            duration=c3d_data["duration"],
+                            # Use date_added from file stats if available, else now
+                            date_added=datetime.fromtimestamp(os.path.getctime(filepath)), 
+                            date_modified=datetime.fromtimestamp(os.path.getmtime(filepath)),
+                            # Removed duration - calculate on read
                             frame_count=c3d_data["frame_count"],
                             sample_rate=c3d_data["sample_rate"],
                             subject_name=subject_name,
                             classification=classification,
                             session_name=session_name,
-                            description=c3d_data["metadata"],
+                            file_metadata=metadata_dict, # Use the converted dict
                             has_marker_data=bool(c3d_data["markers"]),
                             has_analog_data=bool(c3d_data["channels"]),
                             has_event_data=bool(c3d_data["events"])

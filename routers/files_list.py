@@ -39,19 +39,6 @@ def list_files(
 ):
     """Get a list of C3D files with pagination and filtering."""
     try:
-        print(f">>> FILES_LIST ENDPOINT HIT <<<")
-        print(f"Received query parameters:")
-        print(f"filename: {filename}, regex: {filename_regex}")
-        print(f"classification: {classification}, regex: {classification_regex}")
-        print(f"subject: {subject}, regex: {subject_regex}")
-        print(f"session_name: {session_name}, regex: {session_regex}")
-        print(f"min_frame_count: {min_frame_count}, max_frame_count: {max_frame_count}")
-        print(f"marker: {marker}, regex: {marker_regex}")
-        print(f"channel: {channel}, regex: {channel_regex}")
-        print(f"event: {event}, regex: {event_regex}")
-        print(f"analysis_name: {analysis_name}")
-        print(f"Limit: {limit}, Offset: {offset}")
-        
         # If any search parameters are provided, use the search function from search router
         if any([filename, classification, subject, session_name, 
                 min_frame_count, max_frame_count, marker, channel, event, analysis_name]):
@@ -122,22 +109,23 @@ def list_files(
             # Get file_size or use 0 if not available
             file_size = getattr(file, 'file_size', 0) if hasattr(file, 'file_size') else 0
             
-            # Get description or use empty string if not available
-            description = getattr(file, 'description', '') if hasattr(file, 'description') else ''
+            # Get file_metadata or use empty dict if not available
+            file_metadata = getattr(file, 'file_metadata', {}) if hasattr(file, 'file_metadata') else {}
             
             result_files.append(
                 FileRead(
+                    id=file.id,
                     filename=filename,
                     filepath=file.filepath,
                     file_size=file_size,
                     date_added=date_created,
                     duration=duration if duration is not None else 0.0,
-                    frame_count=getattr(file, 'frame_count', 0) if hasattr(file, 'frame_count') else 0,
-                    sample_rate=getattr(file, 'sample_rate', 0.0) if hasattr(file, 'sample_rate') else 0.0,
-                    subject_name=getattr(file, 'subject_name', '') if hasattr(file, 'subject_name') else '',
-                    classification=file.classification or '',
-                    session_name=file.session_name or '',
-                    file_metadata=description,
+                    frame_count=getattr(file, 'frame_count', 0),
+                    sample_rate=getattr(file, 'sample_rate', 0.0),
+                    subject_name=getattr(file, 'subject_name', None),
+                    classification=getattr(file, 'classification', None),
+                    session_name=getattr(file, 'session_name', None),
+                    file_metadata=file_metadata,
                     markers=[MarkerRead(marker_name=m.marker_name) for m in markers],
                     channels=[ChannelRead(channel_name=c.channel_name) for c in channels],
                     events=[EventRead(event_name=e.event_name, event_time=e.event_time) for e in events]

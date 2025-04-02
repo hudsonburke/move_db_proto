@@ -1,9 +1,10 @@
 """
 Base models and utilities for the C3D database.
 """
-from typing import ForwardRef
+from typing import ForwardRef, Optional, List, Dict, Any
 from datetime import datetime
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, SQLModel, Column
+from sqlalchemy import JSON
 
 class BaseModel(SQLModel):
     """Base model with common fields and methods."""
@@ -52,16 +53,40 @@ def setup_relationship_handlers() -> None:
     
     # Import models here to avoid circular imports
     from .c3d_file import C3DFile
-    from .group import TrialGroup
     from .marker import Marker
     from .channel import AnalogChannel
     from .event import Event
     
     # Update forward references
     C3DFile.model_rebuild()
-    TrialGroup.model_rebuild()
     Marker.model_rebuild()
     AnalogChannel.model_rebuild()
     Event.model_rebuild()
     
     _initialized = True
+
+class C3DFileBase(SQLModel):
+    """Base model for C3D files with common fields."""
+    filename: str
+    filepath: str
+    file_size: int
+    date_added: datetime = Field(default_factory=datetime.now)
+    frame_count: int
+    sample_rate: float
+    subject_name: Optional[str] = None
+    classification: Optional[str] = None
+    session_name: Optional[str] = None
+    file_metadata: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+
+class MarkerBase(SQLModel):
+    """Base model for markers with common fields."""
+    marker_name: str
+
+class AnalogChannelBase(SQLModel):
+    """Base model for analog channels with common fields."""
+    channel_name: str
+
+class EventBase(SQLModel):
+    """Base model for events with common fields."""
+    event_name: str
+    event_time: float
