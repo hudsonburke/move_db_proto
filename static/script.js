@@ -60,7 +60,16 @@ document.addEventListener('DOMContentLoaded', function() {
             groupFiles: [], // Holds the files for the currently viewed group
             loadingGroupFiles: false,
             savingGroup: false, // Loading state for create/edit group action
-            addingFilesToGroup: false // Loading state for adding files to group action
+            addingFilesToGroup: false, // Loading state for adding files to group action
+
+            // --- Plotting Data ---
+            availablePlots: [],
+            selectedPlot: null,
+            selectedPlotDetails: null,
+            isPlotLoading: false,
+            plotMarkerOptions: [], // Separate options for selectors
+            plotChannelOptions: [], // Separate options for selectors
+            selectedFileId: null, // ID of the file selected in the plot tab
         },
         computed: {
             parsedAnalysisParams: {
@@ -74,6 +83,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 set(value) {
                     this.searchFilters.analysis_params = JSON.stringify(value);
                 }
+            },
+            // Computed property to show/hide marker selector based on selected plot
+            showMarkerSelector() {
+                return this.selectedPlotDetails && this.selectedPlotDetails.requires_markers;
+            },
+            // Computed property to show/hide channel selector based on selected plot
+            showChannelSelector() {
+                return this.selectedPlotDetails && this.selectedPlotDetails.requires_channels;
             }
         },
         methods: {
@@ -802,12 +819,245 @@ document.addEventListener('DOMContentLoaded', function() {
                      // this.loadingGroupFiles = false; // Turn off modal loading indicator
                 }
             },
+
+            // --- Plotting Methods ---
+            async loadAvailablePlots() {
+                console.log("Loading available plots...");
+                try {
+                    const response = await fetch('/api/plots');
+                    if (!response.ok) throw new Error('Failed to load plot types');
+                    const data = await response.json();
+                    this.availablePlots = data.plots || [];
+                    this.populatePlotSelector(); // Call method to update dropdown
+                } catch (error) {
+                    console.error("Error loading available plots:", error);
+                    this.showNotification("Error loading plot types", "danger");
+                }
+            },
+
+            populatePlotSelector() {
+                const select = document.getElementById('plot-select');
+                if (!select) return;
+                select.innerHTML = '<option value="">Choose a plot type...</option>'; 
+                this.availablePlots.forEach(plot => {
+                    const option = document.createElement('option');
+                    option.value = plot.name; 
+                    option.textContent = plot.display_name; 
+                    select.appendChild(option);
+                });
+            },
+
+            async loadPlotAvailableData(fileId) {
+                if (!fileId) return;
+                console.log(`Loading marker/channel data for file ID: ${fileId}`);
+                // Indicate loading maybe? Optional
+                try {
+                    // Fetch markers
+                    const markerUrl = `/api/plot/markers?file_id=${fileId}`;
+                    const markerResponse = await fetch(markerUrl);
+                    if (!markerResponse.ok) throw new Error(`Markers HTTP error! Status: ${markerResponse.status}`);
+                    const markerData = await markerResponse.json();
+                    this.plotMarkerOptions = markerData.markers || []; // Store options
+                    // Don't populate here - let watcher handle it
+                    // this.populateMarkerSelect(); 
+
+                    // Fetch channels
+                    const channelUrl = `/api/plot/channels?file_id=${fileId}`;
+                    const channelResponse = await fetch(channelUrl);
+                    if (!channelResponse.ok) throw new Error(`Channels HTTP error! Status: ${channelResponse.status}`);
+                    const channelData = await channelResponse.json();
+                    this.plotChannelOptions = channelData.channels || []; // Store options
+                     // Don't populate here - let watcher handle it
+                    // this.populateChannelSelect();
+
+                } catch (error) {
+                    console.error('Error loading plot marker/channel data:', error);
+                    this.showNotification(`Error loading options: ${error.message}`, 'danger');
+                    this.plotMarkerOptions = [];
+                    this.plotChannelOptions = [];
+                    // Clear selectors if visible
+                    this.$nextTick(() => {
+                        this.populateMarkerSelect();
+                        this.populateChannelSelect();
+                    });
+                }
+            },
+
+            populateMarkerSelect() {
+                const select = document.getElementById('marker-select');
+                // Guard against the element not existing (important!)
+                if (!select) {
+                     console.warn("[populateMarkerSelect] Marker select element not found.");
+                     return;
+                }
+                console.log(`[populateMarkerSelect] Populating with ${this.plotMarkerOptions.length} options.`);
+                select.innerHTML = ''; // Clear previous options
+                this.plotMarkerOptions.forEach(marker => {
+                    const option = document.createElement('option');
+                    option.value = marker;
+                    option.textContent = marker;
+                    select.appendChild(option);
+                });
+            },
+
+            populateChannelSelect() {
+                const select = document.getElementById('channel-select');
+                 // Guard against the element not existing (important!)
+                if (!select) {
+                    console.warn("[populateChannelSelect] Channel select element not found.");
+                    return;
+                }
+                console.log(`[populateChannelSelect] Populating with ${this.plotChannelOptions.length} options.`);
+                select.innerHTML = ''; // Clear previous options
+                this.plotChannelOptions.forEach(channel => {
+                    const option = document.createElement('option');
+                    option.value = channel;
+                    option.textContent = channel;
+                    select.appendChild(option);
+                });
+            },
+            
+            clearPlot() {
+                const container = document.getElementById('plot-container');
+                // Add check for container existence
+                if (container) {
+                    try {
+                        Plotly.purge(container); // Use container element directly
+                    } catch(e) { 
+                         console.warn("[clearPlot] Error purging Plotly:", e);
+                    }
+                    container.innerHTML = ''; // Clear any remaining content (like error messages)
+                } else {
+                     console.warn("[clearPlot] Plot container not found.");
+                }
+            },
+
+            async updatePlot() {
+                if (!this.selectedFileId || !this.selectedPlot) {
+                    this.showNotification("Please select a file and a plot type.", "warning");
+                    return;
+                }
+
+                const fileId = this.selectedFileId;
+                console.log(`Updating plot for file ID: ${fileId}, Plot: ${this.selectedPlot}`);
+                this.isPlotLoading = true;
+                this.clearPlot(); 
+
+                try {
+                    const markerSelect = document.getElementById('marker-select');
+                    const channelSelect = document.getElementById('channel-select');
+                    
+                    const selectedMarkers = markerSelect ? Array.from(markerSelect.selectedOptions).map(option => option.value) : [];
+                    const selectedChannels = channelSelect ? Array.from(channelSelect.selectedOptions).map(option => option.value) : [];
+
+                    const parameters = {};
+                    if (this.selectedPlotDetails?.requires_markers) {
+                        parameters.markers = selectedMarkers;
+                    }
+                    if (this.selectedPlotDetails?.requires_channels) {
+                        parameters.channels = selectedChannels;
+                    }
+
+                    const encodedParams = encodeURIComponent(JSON.stringify(parameters));
+                    const plotDataUrl = `/api/plot?file_id=${fileId}&plot_name=${encodeURIComponent(this.selectedPlot)}&parameters=${encodedParams}`;
+                    console.log(`Fetching plot data from: ${plotDataUrl}`);
+                    const response = await fetch(plotDataUrl);
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`Plot data HTTP error! Status: ${response.status} - ${errorText}`);
+                    }
+                    const data = await response.json();
+
+                    const traces = data.traces || [];
+                    const layout = data.layout || {};
+                    const config = data.config || {};
+
+                    const plotDiv = document.getElementById('plot-container');
+                    // Add check for plotDiv existence
+                    if (!plotDiv) { 
+                        throw new Error("Plot container not found in DOM!"); 
+                    }
+                    
+                    Plotly.newPlot(plotDiv, traces, layout, config);
+                    
+                    // Also check before resizing
+                    if(plotDiv) {
+                        try {
+                            Plotly.Plots.resize(plotDiv);
+                        } catch (resizeError) {
+                            console.warn("[Debug] Error calling Plotly resize:", resizeError);
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error updating plot:", error);
+                    const container = document.getElementById('plot-container');
+                    if(container) {
+                         container.innerHTML = 
+                            `<div class="alert alert-danger">Error generating plot: ${error.message}</div>`;
+                    } else {
+                        this.showNotification(`Error generating plot: ${error.message}`, "danger");
+                    }
+                } finally {
+                    this.isPlotLoading = false;
+                }
+            }
         },
         watch: {
             selectedFiles(newValue, oldValue) {
                 console.log(`[Debug] Watcher: selectedFiles changed.`);
                 console.log(`  Old value:`, JSON.stringify(oldValue));
                 console.log(`  New value:`, JSON.stringify(newValue));
+            },
+            // Watch for file selection changes relevant to plotting
+            selectedFileId(newFileId, oldFileId) {
+                if (newFileId !== oldFileId) {
+                    console.log("[Plot Watcher] File changed, loading available data...");
+                    this.plotMarkerOptions = []; // Clear old options
+                    this.plotChannelOptions = [];
+                    this.selectedPlotDetails = null; // Also reset plot details
+                    // this.selectedPlot = null; // Optionally reset plot selection too
+                    this.clearPlot();
+                    if (newFileId) {
+                        this.loadPlotAvailableData(newFileId); // Load data, but don't populate yet
+                    } else {
+                        // Clear selectors if file is deselected
+                         const markerSelect = document.getElementById('marker-select');
+                         if (markerSelect) markerSelect.innerHTML = '';
+                         const channelSelect = document.getElementById('channel-select');
+                         if (channelSelect) channelSelect.innerHTML = '';
+                    }
+                }
+            },
+             // Watch for plot type changes
+            selectedPlot(newPlotName, oldPlotName) {
+                if (newPlotName !== oldPlotName) {
+                    console.log("[Plot Watcher] Plot type changed...");
+                    this.selectedPlotDetails = this.availablePlots.find(p => p.name === newPlotName) || null;
+                    this.clearPlot();
+                    // Selectors will be shown/hidden by computed props and v-if
+                    // Population will be triggered by the showMarker/ChannelSelector watchers if needed
+                }
+            },
+            // NEW: Watcher to populate marker select when it becomes visible
+            showMarkerSelector(isVisible) {
+                if (isVisible) {
+                    console.log("[Plot Watcher] Marker selector now visible, populating...");
+                    // Use nextTick to ensure the element is in the DOM after v-if becomes true
+                    this.$nextTick(() => {
+                        this.populateMarkerSelect();
+                    });
+                }
+            },
+            // NEW: Watcher to populate channel select when it becomes visible
+            showChannelSelector(isVisible) {
+                if (isVisible) {
+                    console.log("[Plot Watcher] Channel selector now visible, populating...");
+                    // Use nextTick to ensure the element is in the DOM after v-if becomes true
+                     this.$nextTick(() => {
+                        this.populateChannelSelect();
+                    });
+                }
             }
         },
         mounted() {
@@ -817,6 +1067,7 @@ document.addEventListener('DOMContentLoaded', function() {
             this.loadAnalyses();
             this.loadGroups(); // Load groups on initial mount
             this.searchFiles();
+            this.loadAvailablePlots(); // Load plot types on mount
         }
     });
     console.log("[Debug] Vue instance created.", app);

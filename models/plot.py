@@ -6,9 +6,11 @@ from typing import Dict, List, Optional, Any
 class BasePlot(ABC):
     """Base class for all plotting implementations."""
     
-    def __init__(self, name: str, description: str):
+    def __init__(self, name: str, description: str, requires_markers: bool = False, requires_channels: bool = False):
         self.name = name
         self.description = description
+        self.requires_markers = requires_markers
+        self.requires_channels = requires_channels
         self.parameters: Dict[str, Any] = {}
     
     @abstractmethod
@@ -41,27 +43,27 @@ class MarkerTrajectoryPlot(BasePlot):
     def __init__(self):
         super().__init__(
             name="Marker Trajectories",
-            description="Plot marker positions over time"
+            description="Plot marker positions over time",
+            requires_markers=True
         )
     
     def plot(self, c3d_data: Dict[str, Any]) -> Dict[str, Any]:
-        traces = []
+        trace_list = []
         
-        # Get selected markers from parameters
         selected_markers = self.parameters.get('markers', [])
         
         for marker_name in selected_markers:
             if marker_name in c3d_data['marker_data']:
                 data = c3d_data['marker_data'][marker_name]
+                time_points = c3d_data.get('time_points', [])
                 for axis, label in [('x', 'X'), ('y', 'Y'), ('z', 'Z')]:
-                    traces.append(
-                        go.Scatter(
-                            name=f"{marker_name} {label}",
-                            x=c3d_data['time_points'],
-                            y=data[axis],
-                            mode='lines'
-                        )
-                    )
+                    trace_list.append({
+                        "type": "scatter",
+                        "name": f"{marker_name} {label}",
+                        "x": time_points,
+                        "y": data.get(axis, []),
+                        "mode": 'lines'
+                    })
         
         layout = {
             'title': 'Marker Trajectories',
@@ -72,7 +74,7 @@ class MarkerTrajectoryPlot(BasePlot):
         }
         
         return {
-            'traces': traces,
+            'traces': trace_list,
             'layout': layout,
             'config': {'responsive': True}
         }
@@ -83,25 +85,25 @@ class AnalogChannelPlot(BasePlot):
     def __init__(self):
         super().__init__(
             name="Analog Channels",
-            description="Plot analog channel data over time"
+            description="Plot analog channel data over time",
+            requires_channels=True
         )
     
     def plot(self, c3d_data: Dict[str, Any]) -> Dict[str, Any]:
-        traces = []
+        trace_list = []
         
-        # Get selected channels from parameters
         selected_channels = self.parameters.get('channels', [])
+        time_points = c3d_data.get('time_points', [])
         
         for channel_name in selected_channels:
             if channel_name in c3d_data['channel_data']:
-                traces.append(
-                    go.Scatter(
-                        name=channel_name,
-                        x=c3d_data['time_points'],
-                        y=c3d_data['channel_data'][channel_name],
-                        mode='lines'
-                    )
-                )
+                trace_list.append({
+                    "type": "scatter",
+                    "name": channel_name,
+                    "x": time_points,
+                    "y": c3d_data['channel_data'][channel_name],
+                    "mode": 'lines'
+                })
         
         layout = {
             'title': 'Analog Channel Data',
@@ -112,7 +114,7 @@ class AnalogChannelPlot(BasePlot):
         }
         
         return {
-            'traces': traces,
+            'traces': trace_list,
             'layout': layout,
             'config': {'responsive': True}
         } 

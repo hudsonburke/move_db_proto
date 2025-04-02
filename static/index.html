@@ -60,6 +60,13 @@
             font-style: italic;
             margin-bottom: 1rem;
         }
+        
+        /* Ensure plot container has size */
+        #plot-container {
+            min-height: 400px; /* Give it a default height */
+            width: 100%;
+            visibility: visible; /* Ensure it's not hidden */
+        }
     </style>
 </head>
 <body>
@@ -551,35 +558,69 @@
                                         <h5 class="card-title mb-0">Plot Controls</h5>
                                     </div>
                                     <div class="card-body">
+                                        <!-- File Selector - Bind to selectedFileId -->
                                         <div class="mb-3">
-                                            <label for="plot-file-select" class="form-label">Select File</label>
-                                            <select class="form-select" id="plot-file-select">
-                                                <option value="">Choose a file...</option>
+                                            <label for="plot-file-select" class="form-label">1. Select File</label>
+                                            <select class="form-select" id="plot-file-select" v-model.number="selectedFileId">
+                                                <option :value="null">Choose a file...</option>
+                                                <option v-for="file in files" :key="file.id" :value="file.id">
+                                                    {{ file.filename }} (ID: {{ file.id }})
+                                                </option>
                                             </select>
                                         </div>
+                                        <!-- Plot Type Selector - Bind to selectedPlot -->
                                         <div class="mb-3">
-                                            <label for="plot-select" class="form-label">Select Plot Type</label>
-                                            <select class="form-select" id="plot-select">
+                                            <label for="plot-select" class="form-label">2. Select Plot Type</label>
+                                            <select class="form-select" id="plot-select" v-model="selectedPlot" :disabled="!selectedFileId">
                                                 <option value="">Choose a plot type...</option>
+                                                <option v-for="plot in availablePlots" :key="plot.name" :value="plot.name">
+                                                    {{ plot.display_name }}
+                                                </option>
                                             </select>
                                         </div>
-                                        <div class="mb-3">
-                                            <label for="marker-select" class="form-label">Select Markers</label>
+                                        
+                                        <!-- Conditional Marker Selector - Use computed property -->
+                                        <div class="mb-3" v-if="showMarkerSelector">
+                                            <label for="marker-select" class="form-label">3. Select Markers</label>
                                             <select class="form-select" id="marker-select" multiple>
+                                                <option v-for="marker in plotMarkerOptions" :key="marker" :value="marker">
+                                                    {{ marker }}
+                                                </option>
                                             </select>
+                                            <small class="form-text text-muted">Ctrl/Cmd+Click to select multiple.</small>
                                         </div>
-                                        <div class="mb-3">
-                                            <label for="channel-select" class="form-label">Select Channels</label>
+                                        
+                                        <!-- Conditional Channel Selector - Use computed property -->
+                                         <div class="mb-3" v-if="showChannelSelector">
+                                            <label for="channel-select" class="form-label">3. Select Channels</label>
                                             <select class="form-select" id="channel-select" multiple>
+                                                 <option v-for="channel in plotChannelOptions" :key="channel" :value="channel">
+                                                    {{ channel }}
+                                                </option>
                                             </select>
+                                            <small class="form-text text-muted">Ctrl/Cmd+Click to select multiple.</small>
                                         </div>
+
+                                        <!-- Update Button - Method name is correct -->
+                                        <button type="button" class="btn btn-primary w-100" @click="updatePlot" :disabled="!selectedFileId || !selectedPlot || isPlotLoading">
+                                            <span v-if="isPlotLoading" class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                            {{ isPlotLoading ? 'Loading...' : 'Update Plot' }}
+                                        </button>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-9">
                                 <div class="card">
                                     <div class="card-body">
-                                        <div id="plot-container"></div>
+                                        <!-- Loading Indicator - Binding is correct -->
+                                        <div v-if="isPlotLoading" class="text-center p-5">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Loading plot...</span>
+                                            </div>
+                                            <p class="mt-2">Loading plot data...</p>
+                                        </div>
+                                        <!-- Plot Container - Binding is correct -->
+                                        <div id="plot-container" :style="{ visibility: isPlotLoading ? 'hidden' : 'visible' }"></div>
                                     </div>
                                 </div>
                             </div>
@@ -750,6 +791,5 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Load custom scripts AFTER dependencies -->
     <script src="script.js"></script> 
-    <script src="/js/plotting.js"></script>
 </body>
 </html>
