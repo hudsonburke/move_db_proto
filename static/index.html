@@ -78,7 +78,7 @@
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="search-tab" data-bs-toggle="tab" data-bs-target="#search-tab-pane" 
                                 type="button" role="tab" aria-controls="search-tab-pane" aria-selected="true">
-                            <i class="bi bi-search"></i> Search
+                            <i class="bi bi-search"></i> Browser
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
@@ -104,22 +104,72 @@
                     <div class="row">
                         <!-- Left sidebar with search controls -->
                         <div class="col-md-4">
-                            <!-- Directory scan card -->
+                            <!-- Data Hierarchy Management Card -->
                             <div class="card mb-4">
-                                <div class="card-header">
-                                    <h5 class="card-title mb-0">Scan Directory for C3D Files</h5>
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5 class="card-title mb-0">Data Hierarchy</h5>
+                                    <div class="d-flex">
+                                        <button class="btn btn-sm btn-success me-2" @click="showDirectoryScanCard">
+                                            <i class="bi bi-folder-plus"></i> Import
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-primary" @click="refreshHierarchy">
+                                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="card-body">
-                                    <form @submit.prevent="handleDirectoryScan">
-                                        <div class="mb-3">
-                                            <label for="directoryInput" class="form-label">Directory Path</label>
-                                            <input type="text" class="form-control" v-model="directoryPath" placeholder="/path/to/c3d/files">
+                                    <!-- Classifications Filter -->
+                                    <div class="mb-3">
+                                        <label for="classificationFilter" class="form-label">Classification</label>
+                                        <div class="input-group">
+                                            <select id="classificationFilter" class="form-select" v-model="hierarchyFilters.classificationId" @change="loadHierarchySubjects">
+                                                <option value="">All Classifications</option>
+                                                <option v-for="classification in hierarchyData.classifications" :value="classification.id">
+                                                    {{ classification.name }}
+                                                </option>
+                                            </select>
+                                            <button class="btn btn-outline-primary" @click="showCreateClassificationModal" title="Create new classification">
+                                                <i class="bi bi-plus-circle"></i>
+                                            </button>
                                         </div>
-                                        <button type="submit" class="btn btn-primary">Scan Directory</button>
-                                    </form>
-                                    <div class="mt-3" v-html="directoryStatus"></div>
-                                    <div class="mt-3">
-                                        <small class="text-muted">This will scan the directory and all subdirectories for C3D files, extracting metadata without copying the files.</small>
+                                    </div>
+                                    
+                                    <!-- Subjects Filter -->
+                                    <div class="mb-3">
+                                        <label for="subjectFilter" class="form-label">Subject</label>
+                                        <div class="input-group">
+                                            <select id="subjectFilter" class="form-select" v-model="hierarchyFilters.subjectId" @change="loadHierarchySessions">
+                                                <option value="">All Subjects</option>
+                                                <option v-for="subject in hierarchyData.subjects" :value="subject.id">
+                                                    {{ subject.name }}
+                                                </option>
+                                            </select>
+                                            <button class="btn btn-outline-primary" :disabled="!hierarchyFilters.classificationId" @click="showCreateSubjectModal" title="Create new subject">
+                                                <i class="bi bi-plus-circle"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Sessions Filter -->
+                                    <div class="mb-3">
+                                        <label for="sessionFilter" class="form-label">Session</label>
+                                        <div class="input-group">
+                                            <select id="sessionFilter" class="form-select" v-model="hierarchyFilters.sessionId" @change="loadHierarchyTrials">
+                                                <option value="">All Sessions</option>
+                                                <option v-for="session in hierarchyData.sessions" :value="session.id">
+                                                    {{ session.name }}
+                                                </option>
+                                            </select>
+                                            <button class="btn btn-outline-primary" :disabled="!hierarchyFilters.subjectId" @click="showCreateSessionModal" title="Create new session">
+                                                <i class="bi bi-plus-circle"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-2">
+                                        <button class="btn btn-sm btn-outline-primary w-100" :disabled="!hierarchyFilters.sessionId" @click="showCreateTrialModal">
+                                            <i class="bi bi-plus-circle"></i> New Trial
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -359,35 +409,6 @@
                                 </div>
                             </div>
 
-                            <!-- Hierarchy Filter Controls -->
-                            <div class="card mb-3">
-                                <div class="card-body">
-                                    <div class="row">
-                                        <div class="col-md-4">
-                                            <label for="classificationFilter" class="form-label">Classification</label>
-                                            <select class="form-select" v-model="selectedClassification" @change="loadSubjects">
-                                                <option value="">All Classifications</option>
-                                                <option v-for="classification in classifications" :key="classification" :value="classification">{{ classification }}</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label for="subjectFilter" class="form-label">Subject</label>
-                                            <select class="form-select" v-model="selectedSubject" @change="loadSessions">
-                                                <option value="">All Subjects</option>
-                                                <option v-for="subject in subjects" :key="subject" :value="subject">{{ subject }}</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <label for="sessionFilter" class="form-label">Session</label>
-                                            <select class="form-select" v-model="selectedSession" @change="searchFiles">
-                                                <option value="">All Sessions</option>
-                                                <option v-for="session in sessions" :key="session" :value="session">{{ session }}</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
                             <!-- Select all checkbox -->
                             <div class="form-check mb-2" v-if="files.length > 0">
                                 <input class="form-check-input" type="checkbox" v-model="selectAllFiles" @change="toggleSelectAll" id="selectAllCheckbox">
@@ -492,7 +513,7 @@
                     </div>
                 </div>
 
-                <!-- Groups Tab Pane -->
+                <!-- Groups Tab -->
                 <div class="tab-pane fade" id="groups-tab-pane" role="tabpanel" aria-labelledby="groups-tab" tabindex="0">
                     <div class="container mt-4">
                         <div class="d-flex justify-content-between align-items-center mb-3">
@@ -725,56 +746,206 @@
 
         <!-- Group Files Modal -->
         <div class="modal fade" id="groupFilesModal" tabindex="-1" aria-labelledby="groupFilesModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-xl">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="groupFilesModalLabel">Files in Group: {{ currentGroup ? currentGroup.name : '' }}</h5>
+                        <h5 class="modal-title" id="groupFilesModalLabel">Group Files</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="modal-body">
-                        <!-- Loading State -->
-                        <div v-if="loadingGroupFiles" class="text-center">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading files...</span>
+                    <div class="modal-body p-0">
+                        <div class="group-files-view" :class="{ 'showing-file-details': viewingFileInGroup }">
+                            <!-- Group Files List Panel -->
+                            <div class="group-files-list p-3">
+                                <div v-if="loadingGroupFiles" class="text-center p-5">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-2">Loading group files...</p>
+                                </div>
+                                
+                                <div v-else-if="groupFiles.length === 0" class="text-center p-5">
+                                    <p class="text-muted">No files in this group.</p>
+                                </div>
+                                
+                                <div v-else>
+                                    <h6 v-if="currentGroup" class="mb-3">{{ currentGroup.name }} ({{ groupFiles.length }} files)</h6>
+                                    
+                                    <div class="table-responsive">
+                                        <table class="table table-hover table-sm">
+                                            <thead>
+                                                <tr>
+                                                    <th>Filename</th>
+                                                    <th>Classification</th>
+                                                    <th>Subject</th>
+                                                    <th>Session</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr v-for="file in groupFiles" :key="file.id">
+                                                    <td>{{ file.filename }}</td>
+                                                    <td>{{ file.classification || 'N/A' }}</td>
+                                                    <td>{{ file.subject_name || 'N/A' }}</td>
+                                                    <td>{{ file.session_name || 'N/A' }}</td>
+                                                    <td>
+                                                        <div class="btn-group btn-group-sm">
+                                                            <button class="btn btn-outline-primary" @click.prevent="showFileDetailsInGroup(file.id)">
+                                                                <i class="bi bi-info-circle"></i> View
+                                                            </button>
+                                                            <button class="btn btn-outline-danger" @click.prevent="removeFileFromGroup(file.id)">
+                                                                <i class="bi bi-x-circle"></i> Remove
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                        <!-- Empty State -->
-                        <div v-else-if="groupFiles.length === 0" class="alert alert-light text-center">
-                            This group currently contains no files.
-                        </div>
-                        <!-- File Table -->
-                        <div v-else class="table-responsive">
-                            <table class="table table-hover table-sm align-middle">
-                                <thead>
-                                    <tr>
-                                        <th>Filename</th>
-                                        <th>Classification</th>
-                                        <th>Subject</th>
-                                        <th>Session</th>
-                                        <th>Duration</th>
-                                        <th class="text-end">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="file in groupFiles" :key="file.id">
-                                        <td class="text-truncate" :title="file.filename">{{ file.filename }}</td>
-                                        <td>{{ file.classification || 'N/A' }}</td>
-                                        <td>{{ file.subject_name || 'N/A' }}</td>
-                                        <td>{{ file.session_name || 'N/A' }}</td>
-                                        <td>{{ formatDuration(file.duration) }}</td>
-                                        <td class="text-end">
-                                            <div class="btn-group btn-group-sm">
-                                                <button class="btn btn-outline-primary" @click="showFileDetails(file.id)" title="View Details">
-                                                    <i class="bi bi-eye"></i>
-                                                </button>
-                                                <button class="btn btn-outline-danger" @click="removeFileFromGroup(file.id)" title="Remove from Group">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
+                            
+                            <!-- File Details Panel -->
+                            <div class="file-details-panel" :class="{ 'active': viewingFileInGroup }" v-if="viewingFileInGroup">
+                                <div v-if="loadingGroupFileDetails" class="text-center p-5">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-2">Loading file details...</p>
+                                </div>
+                                
+                                <div v-else-if="selectedGroupFileDetails" class="p-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <button class="btn btn-sm btn-outline-secondary" @click="hideFileDetailsInGroup">
+                                            <i class="bi bi-arrow-left"></i> Back to group
+                                        </button>
+                                        
+                                        <h5>{{ selectedGroupFileDetails.filename }}</h5>
+                                        
+                                        <a :href="`/api/files/download?path=${encodeURIComponent(selectedGroupFileDetails.filepath)}`" 
+                                           class="btn btn-sm btn-outline-primary" 
+                                           target="_blank">
+                                            <i class="bi bi-download"></i> Download
+                                        </a>
+                                    </div>
+                                    
+                                    <div class="card mb-3">
+                                        <div class="card-header">File Information</div>
+                                        <div class="card-body">
+                                            <div class="row">
+                                                <div class="col-md-6 mb-2">
+                                                    <strong>Classification:</strong> {{ selectedGroupFileDetails.classification || 'N/A' }}
+                                                </div>
+                                                <div class="col-md-6 mb-2">
+                                                    <strong>Subject:</strong> {{ selectedGroupFileDetails.subject_name || 'N/A' }}
+                                                </div>
+                                                <div class="col-md-6 mb-2">
+                                                    <strong>Session:</strong> {{ selectedGroupFileDetails.session_name || 'N/A' }}
+                                                </div>
+                                                <div class="col-md-6 mb-2">
+                                                    <strong>Duration:</strong> {{ selectedGroupFileDetails.duration ? selectedGroupFileDetails.duration.toFixed(2) + ' s' : 'N/A' }}
+                                                </div>
+                                                <div class="col-md-6 mb-2">
+                                                    <strong>Frames:</strong> {{ selectedGroupFileDetails.frame_count || 'N/A' }}
+                                                </div>
+                                                <div class="col-md-6 mb-2">
+                                                    <strong>Sample Rate:</strong> {{ selectedGroupFileDetails.sample_rate ? selectedGroupFileDetails.sample_rate.toFixed(2) + ' Hz' : 'N/A' }}
+                                                </div>
+                                                <div class="col-md-6 mb-2">
+                                                    <strong>File Size:</strong> {{ formatFileSize(selectedGroupFileDetails.file_size) }}
+                                                </div>
+                                                <div class="col-md-6 mb-2">
+                                                    <strong>Date Added:</strong> {{ formatDate(selectedGroupFileDetails.date_added) }}
+                                                </div>
+                                                <div class="col-12 mb-2">
+                                                    <strong>Path:</strong> <span class="text-muted small">{{ selectedGroupFileDetails.filepath }}</span>
+                                                </div>
                                             </div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Markers Section -->
+                                    <div class="card mb-3" v-if="selectedGroupFileDetails.markers && selectedGroupFileDetails.markers.length > 0">
+                                        <div class="card-header">Markers ({{ selectedGroupFileDetails.markers.length }})</div>
+                                        <div class="card-body p-0">
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-hover mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Name</th>
+                                                            <th>Type</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr v-for="marker in selectedGroupFileDetails.markers.slice(0, 10)" :key="marker.id">
+                                                            <td>{{ marker.marker_name }}</td>
+                                                            <td>{{ marker.type || 'Standard' }}</td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div v-if="selectedGroupFileDetails.markers.length > 10" class="text-center p-2">
+                                                <small class="text-muted">Showing 10 of {{ selectedGroupFileDetails.markers.length }} markers</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Analog Channels Section -->
+                                    <div class="card mb-3" v-if="selectedGroupFileDetails.channels && selectedGroupFileDetails.channels.length > 0">
+                                        <div class="card-header">Analog Channels ({{ selectedGroupFileDetails.channels.length }})</div>
+                                        <div class="card-body p-0">
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-hover mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Name</th>
+                                                            <th>Rate</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr v-for="channel in selectedGroupFileDetails.channels.slice(0, 10)" :key="channel.id">
+                                                            <td>{{ channel.channel_name }}</td>
+                                                            <td>{{ channel.rate ? channel.rate.toFixed(2) + ' Hz' : 'N/A' }}</td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div v-if="selectedGroupFileDetails.channels.length > 10" class="text-center p-2">
+                                                <small class="text-muted">Showing 10 of {{ selectedGroupFileDetails.channels.length }} channels</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Events Section -->
+                                    <div class="card mb-3" v-if="selectedGroupFileDetails.events && selectedGroupFileDetails.events.length > 0">
+                                        <div class="card-header">Events ({{ selectedGroupFileDetails.events.length }})</div>
+                                        <div class="card-body p-0">
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-hover mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Label</th>
+                                                            <th>Time</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr v-for="event in selectedGroupFileDetails.events.slice(0, 10)" :key="event.id">
+                                                            <td>{{ event.event_name }}</td>
+                                                            <td>{{ event.event_time ? event.event_time.toFixed(2) + ' s' : 'N/A' }}</td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div v-if="selectedGroupFileDetails.events.length > 10" class="text-center p-2">
+                                                <small class="text-muted">Showing 10 of {{ selectedGroupFileDetails.events.length }} events</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div v-if="!selectedGroupFileDetails.markers?.length && !selectedGroupFileDetails.channels?.length && !selectedGroupFileDetails.events?.length" class="alert alert-info">
+                                        No additional data available for this file.
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -783,7 +954,266 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Trial Results Modal -->
+        <div class="modal fade" id="trialResultsModal" tabindex="-1" aria-labelledby="trialResultsModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="trialResultsModalLabel">Trial Results</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div v-if="selectedTrial">
+                            <!-- Results in formatted JSON -->
+                            <div class="mb-3">
+                                <h6>Results Data:</h6>
+                                <pre class="bg-light p-3 rounded">{{ JSON.stringify(selectedTrial.results, null, 2) }}</pre>
+                            </div>
+                            
+                            <!-- Linked Files (if any) -->
+                            <div class="mb-3" v-if="selectedTrial.results.output_files">
+                                <h6>Output Files:</h6>
+                                <ul class="list-group">
+                                    <li class="list-group-item" v-for="(path, key) in selectedTrial.results.output_files">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span>{{ key }}:</span>
+                                            <span class="text-muted small">{{ path }}</span>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Create/Edit Trial Modal -->
+        <div class="modal fade" id="trialModal" tabindex="-1" aria-labelledby="trialModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="trialModalLabel">{{ editingTrialId ? 'Edit Trial' : 'Create New Trial' }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form @submit.prevent="saveTrial">
+                            <div class="mb-3">
+                                <label for="trialName" class="form-label">Name</label>
+                                <input type="text" class="form-control" id="trialName" v-model="trialForm.name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="trialDescription" class="form-label">Description</label>
+                                <textarea class="form-control" id="trialDescription" v-model="trialForm.description" rows="3"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="trialC3DFile" class="form-label">C3D File</label>
+                                <select class="form-select" id="trialC3DFile" v-model="trialForm.c3d_file_id">
+                                    <option value="">No C3D File</option>
+                                    <option v-for="file in availableC3DFiles" :value="file.id">{{ file.filename }}</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="trialParameters" class="form-label">Parameters (JSON)</label>
+                                <textarea class="form-control" id="trialParameters" v-model="trialForm.parameters_json" rows="3" 
+                                          placeholder='{"key": "value"}' @input="validateJson('parameters')"></textarea>
+                                <div class="invalid-feedback" :class="{ 'd-block': parametersJsonError }">
+                                    {{ parametersJsonError }}
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary" :disabled="savingTrial || parametersJsonError">
+                                    <span v-if="savingTrial" class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                    Save
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Create/Edit Classification Modal -->
+        <div class="modal fade" id="classificationModal" tabindex="-1" aria-labelledby="classificationModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="classificationModalLabel">{{ editingClassificationId ? 'Edit Classification' : 'Create New Classification' }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form @submit.prevent="saveClassification">
+                            <div class="mb-3">
+                                <label for="classificationName" class="form-label">Name</label>
+                                <input type="text" class="form-control" id="classificationName" v-model="classificationForm.name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="classificationDescription" class="form-label">Description</label>
+                                <textarea class="form-control" id="classificationDescription" v-model="classificationForm.description" rows="3"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="classificationMetaData" class="form-label">Metadata (JSON)</label>
+                                <textarea class="form-control" id="classificationMetaData" v-model="classificationForm.meta_data_json" rows="3" 
+                                          placeholder='{"key": "value"}' @input="validateJson('meta_data')"></textarea>
+                                <div class="invalid-feedback" :class="{ 'd-block': metaDataJsonError }">
+                                    {{ metaDataJsonError }}
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary" :disabled="savingClassification || metaDataJsonError">
+                                    <span v-if="savingClassification" class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                    Save
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Create/Edit Subject Modal -->
+        <div class="modal fade" id="subjectModal" tabindex="-1" aria-labelledby="subjectModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="subjectModalLabel">{{ editingSubjectId ? 'Edit Subject' : 'Create New Subject' }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form @submit.prevent="saveSubject">
+                            <div class="mb-3">
+                                <label for="subjectName" class="form-label">Name</label>
+                                <input type="text" class="form-control" id="subjectName" v-model="subjectForm.name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="subjectDescription" class="form-label">Description</label>
+                                <textarea class="form-control" id="subjectDescription" v-model="subjectForm.description" rows="3"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="subjectClassification" class="form-label">Classification</label>
+                                <select class="form-select" id="subjectClassification" v-model="subjectForm.classification_id" required>
+                                    <option v-for="classification in hierarchyData.classifications" :value="classification.id">
+                                        {{ classification.name }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="subjectDemographics" class="form-label">Demographics (JSON)</label>
+                                <textarea class="form-control" id="subjectDemographics" v-model="subjectForm.demographics_json" rows="3" 
+                                          placeholder='{"age": 30, "sex": "M", "height": 180}' @input="validateJson('demographics')"></textarea>
+                                <div class="invalid-feedback" :class="{ 'd-block': demographicsJsonError }">
+                                    {{ demographicsJsonError }}
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary" :disabled="savingSubject || demographicsJsonError">
+                                    <span v-if="savingSubject" class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                    Save
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Create/Edit Session Modal -->
+        <div class="modal fade" id="sessionModal" tabindex="-1" aria-labelledby="sessionModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="sessionModalLabel">{{ editingSessionId ? 'Edit Session' : 'Create New Session' }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form @submit.prevent="saveSession">
+                            <div class="mb-3">
+                                <label for="sessionName" class="form-label">Name</label>
+                                <input type="text" class="form-control" id="sessionName" v-model="sessionForm.name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="sessionDescription" class="form-label">Description</label>
+                                <textarea class="form-control" id="sessionDescription" v-model="sessionForm.description" rows="3"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="sessionSubject" class="form-label">Subject</label>
+                                <select class="form-select" id="sessionSubject" v-model="sessionForm.subject_id" required>
+                                    <option v-for="subject in hierarchyData.subjects" :value="subject.id">
+                                        {{ subject.name }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="sessionDate" class="form-label">Date</label>
+                                <input type="datetime-local" class="form-control" id="sessionDate" v-model="sessionForm.date">
+                            </div>
+                            <div class="mb-3">
+                                <label for="sessionConditions" class="form-label">Conditions (JSON)</label>
+                                <textarea class="form-control" id="sessionConditions" v-model="sessionForm.conditions_json" rows="3" 
+                                          placeholder='{"protocol": "standard", "environment": "lab"}' @input="validateJson('conditions')"></textarea>
+                                <div class="invalid-feedback" :class="{ 'd-block': conditionsJsonError }">
+                                    {{ conditionsJsonError }}
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary" :disabled="savingSession || conditionsJsonError">
+                                    <span v-if="savingSession" class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                    Save
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
         <!-- END MODALS -->
+
+        <!-- Floating Directory Scan Card -->
+        <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050;" v-show="showDirectoryScanFloatingCard">
+            <div class="card shadow-lg" style="width: 400px; max-width: 100%;">
+                <div class="card-header d-flex justify-content-between align-items-center bg-success text-white">
+                    <h5 class="card-title mb-0">Import C3D Files</h5>
+                    <button type="button" class="btn-close btn-close-white" @click="hideDirectoryScanCard"></button>
+                </div>
+                <div class="card-body">
+                    <form @submit.prevent="handleDirectoryScan">
+                        <div class="mb-3">
+                            <label for="directoryInput" class="form-label">Directory Path</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="directoryInput" v-model="directoryPath" placeholder="/path/to/c3d/files">
+                                <button type="button" class="btn btn-outline-secondary" @click="showPathHelpInfo()" title="How to find your directory path">
+                                    <i class="bi bi-question-circle"></i>
+                                </button>
+                            </div>
+                            <small class="form-text text-muted mt-1">
+                                Open your file manager, navigate to the folder with C3D files, and copy its full path.
+                            </small>
+                        </div>
+                        <div class="mb-3">
+                            <div class="alert alert-info small p-2">
+                                <i class="bi bi-info-circle-fill me-1"></i>
+                                This will scan the directory and all subdirectories for C3D files, extracting metadata and creating the 
+                                Classification > Subject > Session > Trial hierarchy.
+                            </div>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success" :disabled="!directoryPath">
+                                <i class="bi bi-folder-check me-1"></i> Scan Directory
+                            </button>
+                        </div>
+                    </form>
+                    <div class="mt-3" v-html="directoryStatus"></div>
+                </div>
+            </div>
+        </div>
 
     </div> <!-- End #app -->
 

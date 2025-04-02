@@ -1,0 +1,110 @@
+/* Group Files Modal Styling */
+.group-files-view {
+    transition: all 0.3s ease-in-out;
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    min-height: 500px;
+    overflow: hidden;
+}
+
+.group-files-list {
+    transition: all 0.3s ease-in-out;
+    overflow-x: auto;
+    width: 100%;
+    flex: 1 0 100%;
+    height: 100%;
+}
+
+.file-details-panel {
+    transition: all 0.3s ease-in-out;
+    border-left: 1px solid #dee2e6;
+    height: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    display: none;
+    width: 0;
+    flex: 0;
+    opacity: 0;
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background: white;
+}
+
+.showing-file-details .group-files-list {
+    width: 33.333%;
+    flex: 0 0 33.333%;
+}
+
+.showing-file-details .file-details-panel {
+    width: 66.667%;
+    flex: 0 0 66.667%;
+    display: block !important;
+    opacity: 1;
+    position: absolute;
+    right: 0;
+    top: 0;
+}
+
+/* Fade in animation */
+.file-details-panel.active {
+    animation: fadeIn 0.3s forwards;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@media (max-width: 767px) {
+    .showing-file-details .group-files-list {
+        display: none;
+        flex: 0;
+    }
+    
+    .showing-file-details .file-details-panel {
+        width: 100%;
+        flex: 0 0 100%;
+    }
+    
+    .file-details-panel {
+        border-left: none;
+    }
+}
+
+/* Responsive tables for group files */
+@media (max-width: 991px) {
+    .group-files-list .table th:nth-child(2),  /* Classification */
+    .group-files-list .table td:nth-child(2),
+    .group-files-list .table th:nth-child(3),  /* Subject */
+    .group-files-list .table td:nth-child(3) {
+        display: none;
+    }
+}
+
+@media (max-width: 767px) {
+    .group-files-list .table th:nth-child(4),  /* Session */
+    .group-files-list .table td:nth-child(4) {
+        display: none;
+    }
+    
+    .group-files-list .table td:last-child .btn-group {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .group-files-list .table td:last-child .btn-group .btn {
+        margin-bottom: 0.25rem;
+        border-radius: 0.25rem !important;
+    }
+}
+
+/* Marker, Channel, Event badges styling */
+.marker-badge, .channel-badge, .event-badge {
+    margin-right: 4px;
+    margin-bottom: 4px;
+    display: inline-block;
+} 

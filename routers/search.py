@@ -130,7 +130,6 @@ def search_files(
 ):
     """Search for C3D files with various filters."""
     query = select(C3DFile)
-    print(f"Query: {query}")
     
     # Handle text search filters
     if filename:

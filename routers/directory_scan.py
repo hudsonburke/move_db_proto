@@ -10,6 +10,13 @@ from models.channel import AnalogChannel
 from models.event import Event
 from app import DATABASE_URL
 from models.analysis import C3DDataExtractor, Analysis
+# Import hierarchy models
+from models.hierarchy import (
+    Classification, ClassificationCreate, 
+    Subject, SubjectCreate,
+    Session as SessionModel, SessionCreate,
+    Trial, TrialCreate
+)
 
 router = APIRouter()
 
@@ -68,7 +75,6 @@ def scan_directory_background(root_directory: str):
                         # Check file size before processing (skip if > 100MB)
                         file_size = os.path.getsize(filepath)
                         if file_size > 100 * 1024 * 1024:  # 100MB
-                            print(f"Skipping large file {filepath} ({file_size / (1024*1024):.2f} MB)")
                             skipped_files.append(file)
                             continue
                         
@@ -78,11 +84,9 @@ def scan_directory_background(root_directory: str):
                         # Extract data and create entries
                         extractor = C3DDataExtractor()
                         c3d_data = extractor.analyze(filepath)
-                        # print(f"Analyzed {file}: {c3d_data}")
                         
                         # Check if file processing took too long
                         if time.time() - file_start > file_timeout:
-                            print(f"Processing {file} took too long, skipping")
                             skipped_files.append(file)
                             continue
                         
@@ -90,22 +94,23 @@ def scan_directory_background(root_directory: str):
                         rel_path = os.path.relpath(root, root_directory)
                         path_parts = rel_path.split(os.path.sep)
                         
-                        classification = ""
-                        session_name = ""
-                        subject_name = c3d_data["subject_name"] or ""
+                        classification_name = "Default"
+                        subject_name = c3d_data["subject_name"] or "Unknown Subject"
+                        session_name = "Default Session"
+                        trial_name = os.path.splitext(file)[0]  # Filename without extension as trial name
                         
                         # If path follows expected structure: Classification/Subject/Session/*.c3d
-                        if len(path_parts) >= 3:
-                            classification = path_parts[0]
-                            if not subject_name:  # Only override if not already set from C3D metadata
+                        if len(path_parts) >= 3 and path_parts[0] != '.':
+                            classification_name = path_parts[0]
+                            if not c3d_data["subject_name"]:  # Only override if not already set from C3D metadata
                                 subject_name = path_parts[1]
                             session_name = path_parts[2]
-                        elif len(path_parts) == 2:
-                            classification = path_parts[0]
-                            if not subject_name:
+                        elif len(path_parts) == 2 and path_parts[0] != '.':
+                            classification_name = path_parts[0]
+                            if not c3d_data["subject_name"]:
                                 subject_name = path_parts[1]
                         elif len(path_parts) == 1 and path_parts[0] != '.':
-                            classification = path_parts[0]
+                            classification_name = path_parts[0]
                         
                         # --- Convert ezc3d Parameters to Dict --- 
                         metadata_dict = {}
@@ -127,10 +132,9 @@ def scan_directory_background(root_directory: str):
                                                     value = str(value) # Fallback to string representation
                                                 metadata_dict[group_name][param_name] = value
                                             except Exception as param_err:
-                                                print(f"  Warning: Could not serialize parameter {param_name} in group {group_name} for file {file}: {param_err}")
-                                                metadata_dict[group_name][param_name] = f"Error serializing: {param_err}"
-                            except Exception as group_err:
-                                 print(f"Warning: Could not process metadata groups for file {file}: {group_err}")
+                                                metadata_dict[group_name][param_name] = f"Error serializing"
+                            except Exception:
+                                 pass
                         # --- End Conversion ---
 
                         # Create database entry with id as primary key and filepath as unique identifier
@@ -145,7 +149,7 @@ def scan_directory_background(root_directory: str):
                             frame_count=c3d_data["frame_count"],
                             sample_rate=c3d_data["sample_rate"],
                             subject_name=subject_name,
-                            classification=classification,
+                            classification=classification_name,
                             session_name=session_name,
                             file_metadata=metadata_dict, # Use the converted dict
                             has_marker_data=bool(c3d_data["markers"]),
@@ -154,6 +158,7 @@ def scan_directory_background(root_directory: str):
                         )
                         
                         try:
+                            # Start transaction for adding the file and creating hierarchy
                             session.add(db_file)
                             session.commit()
                             session.refresh(db_file)  # Refresh to get the assigned id
@@ -183,6 +188,66 @@ def scan_directory_background(root_directory: str):
                                 )
                                 session.add(event)
                             
+                            # Now create or get the classification > subject > session > trial hierarchy
+                            
+                            # 1. Find or create Classification
+                            classification_query = select(Classification).where(Classification.name == classification_name)
+                            classification = session.exec(classification_query).first()
+                            if not classification:
+                                classification = Classification(
+                                    name=classification_name,
+                                    description=f"Auto-created from directory scan: {classification_name}"
+                                )
+                                session.add(classification)
+                                session.commit()
+                                session.refresh(classification)
+                            
+                            # 2. Find or create Subject (within Classification)
+                            subject_query = select(Subject).where(
+                                (Subject.name == subject_name) & 
+                                (Subject.classification_id == classification.id)
+                            )
+                            subject = session.exec(subject_query).first()
+                            if not subject:
+                                subject = Subject(
+                                    name=subject_name,
+                                    description=f"Auto-created from directory scan",
+                                    classification_id=classification.id,
+                                    demographics={"source": "filesystem_import"}
+                                )
+                                session.add(subject)
+                                session.commit()
+                                session.refresh(subject)
+                            
+                            # 3. Find or create Session (within Subject)
+                            session_query = select(SessionModel).where(
+                                (SessionModel.name == session_name) & 
+                                (SessionModel.subject_id == subject.id)
+                            )
+                            db_session = session.exec(session_query).first()
+                            if not db_session:
+                                db_session = SessionModel(
+                                    name=session_name,
+                                    description=f"Auto-created from directory scan",
+                                    subject_id=subject.id,
+                                    date=datetime.fromtimestamp(os.path.getctime(filepath)),
+                                    conditions={"source": "filesystem_import"}
+                                )
+                                session.add(db_session)
+                                session.commit()
+                                session.refresh(db_session)
+                            
+                            # 4. Create Trial (within Session) linked to C3D file
+                            trial = Trial(
+                                name=trial_name,
+                                description=f"Auto-created from file: {file}",
+                                session_id=db_session.id,
+                                c3d_file_id=db_file.id,
+                                parameters={"source": "filesystem_import"},
+                                results={}
+                            )
+                            session.add(trial)
+                            
                             # Apply selected analyses to the C3D file
                             selected_analyses = session.exec(select(Analysis).where(Analysis.file_id == db_file.id)).all()
                             for analysis in selected_analyses:
@@ -198,19 +263,20 @@ def scan_directory_background(root_directory: str):
                                     value=result["value"]
                                 )
                                 session.add(analysis_result)
+                            
+                            # Commit all changes together
                             session.commit()
                             
                             indexed_files.append(file)
                             files_processed += 1
+                            
                         except Exception as e:
                             # Handle unique constraint violations (file already exists)
                             session.rollback()
-                            print(f"File already exists or error occurred: {str(e)}")
                             skipped_files.append(file)
                         
                     except Exception as e:
                         # Skip problematic files but continue
-                        print(f"Error indexing {file}: {str(e)}")
                         skipped_files.append(file)
         
         print(f"Indexed {len(indexed_files)} files, skipped {len(skipped_files)} files")

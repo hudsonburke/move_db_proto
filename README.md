@@ -11,6 +11,35 @@ A web application for managing and searching C3D biomechanics files, built with 
 - View detailed metadata for each file
 - RESTful API for programmatic access
 
+## Architecture Overview
+
+This application is designed with a layered architecture to separate concerns and facilitate extensibility:
+
+1.  **File System:**
+    *   Stores the original `.c3d` files and any large derived data files (e.g., motion files from OpenSim).
+    *   Organizes these files in a user-defined hierarchy.
+    *   The application *references* these files but does not store their raw data directly in the database.
+2.  **Database (SQLModel/SQLite):**
+    *   Stores metadata extracted from the files (e.g., markers, events, duration, parameters).
+    *   Holds information about the file structure and relationships (subjects, sessions, groups).
+    *   Enables efficient querying and filtering without needing to load large C3D files.
+    *   Can store metadata related to user-generated analyses and links to derived files.
+3.  **API (FastAPI):**
+    *   Provides a RESTful interface to interact with the system.
+    *   Handles scanning the file system to populate the database.
+    *   Offers endpoints for querying/managing metadata (files, subjects, groups, etc.).
+    *   Serves as the backend for both the Web App and external User Code.
+4.  **Web App (HTML/JS/CSS served via StaticFiles):**
+    *   Provides a graphical user interface (GUI) for interacting with the API.
+    *   Allows users to browse, search, and manage the C3D metadata visually.
+5.  **User Code (External Scripts/Applications):**
+    *   Separate scripts or applications written by users (e.g., in Python).
+    *   Interacts with the **API** to retrieve file paths, metadata, and group information.
+    *   Performs custom analyses (e.g., biomechanical calculations using OpenSim, custom plotting).
+    *   Can use the **API** to store results (e.g., paths to generated files, calculated metrics) back into the database, associating them with the original data.
+
+This separation allows the core application (API and Web App) to remain focused on data management and presentation, while complex or user-specific computations are handled externally.
+
 ## Installation
 
 ### Prerequisites

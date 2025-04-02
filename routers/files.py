@@ -51,7 +51,7 @@ def get_files(
                 import json
                 parsed_analysis_params = json.loads(analysis_params)
             except:
-                print(f"Error parsing analysis_params: {analysis_params}")
+                pass
         
         # If any search parameters are provided, use the search function from search router
         if any([filename, classification, subject, session_name, min_duration, max_duration, 
@@ -146,11 +146,12 @@ def get_file(filepath: str, session: Session = Depends(get_db_session)):
         raise HTTPException(status_code=404, detail="File not found")
     
     # Get associated data
-    markers = session.exec(select(Marker).where(Marker.file_id == file.filepath)).all()
-    channels = session.exec(select(AnalogChannel).where(AnalogChannel.file_id == file.filepath)).all()
-    events = session.exec(select(Event).where(Event.file_id == file.filepath)).all()
+    markers = session.exec(select(Marker).where(Marker.file_id == file.id)).all()
+    channels = session.exec(select(AnalogChannel).where(AnalogChannel.file_id == file.id)).all()
+    events = session.exec(select(Event).where(Event.file_id == file.id)).all()
     
     return FileRead(
+        id=file.id,
         filename=file.filename,
         filepath=file.filepath,
         file_size=file.file_size,
@@ -225,3 +226,33 @@ def update_file(file_id: int, file: C3DFileCreate, analyses: list[int], session:
     session.commit()
     
     return db_file
+
+@router.get("/files/id/{file_id}", response_model=FileRead)
+def get_file_by_id(file_id: int, session: Session = Depends(get_db_session)):
+    """Get a specific C3D file by ID."""
+    file = session.get(C3DFile, file_id)
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # Get associated data
+    markers = session.exec(select(Marker).where(Marker.file_id == file.id)).all()
+    channels = session.exec(select(AnalogChannel).where(AnalogChannel.file_id == file.id)).all()
+    events = session.exec(select(Event).where(Event.file_id == file.id)).all()
+    
+    return FileRead(
+        id=file.id,
+        filename=file.filename,
+        filepath=file.filepath,
+        file_size=file.file_size,
+        date_added=file.date_added,
+        duration=file.frame_count / file.sample_rate if file.sample_rate else 0.0,
+        frame_count=file.frame_count,
+        sample_rate=file.sample_rate,
+        subject_name=file.subject_name,
+        classification=file.classification,
+        session_name=file.session_name,
+        file_metadata=file.file_metadata,
+        markers=[MarkerRead(marker_name=m.marker_name) for m in markers],
+        channels=[ChannelRead(channel_name=c.channel_name) for c in channels],
+        events=[EventRead(event_name=e.event_name, event_time=e.event_time) for e in events]
+    )

@@ -56,12 +56,17 @@ def setup_relationship_handlers() -> None:
     from .marker import Marker
     from .channel import AnalogChannel
     from .event import Event
+    from .hierarchy import Classification, Subject, Session, Trial
     
     # Update forward references
     C3DFile.model_rebuild()
     Marker.model_rebuild()
     AnalogChannel.model_rebuild()
     Event.model_rebuild()
+    Classification.model_rebuild()
+    Subject.model_rebuild()
+    Session.model_rebuild()
+    Trial.model_rebuild()
     
     _initialized = True
 
